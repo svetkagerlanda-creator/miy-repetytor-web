@@ -86,8 +86,7 @@ textarea{min-height:80px;resize:vertical}
 .finHead{background:#fff;padding:16px;border-bottom:1px solid var(--line)}
 .finMonth{display:flex;align-items:center;justify-content:space-between}
 .finTotal{font-size:34px;font-weight:900;margin-top:10px}
-.finGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
-.finCard{background:#fff;border-radius:14px;padding:14px}
+.finGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}.finCol{display:flex;flex-direction:column;gap:10px}.finColTitle{font-size:14px;color:var(--muted);padding:0 2px 2px}.finCard{background:#fff;border-radius:14px;padding:14px}
 .finCard small{color:var(--muted)}.finCard b{display:block;font-size:19px;margin-top:5px}
 .earningForecast{margin:12px;background:#fff;border-radius:18px;padding:16px}.earningForecastTitle{font-size:20px;margin-bottom:14px}.earningForecastMain{font-size:31px;margin-bottom:4px}.earningForecastSub{color:var(--muted);font-size:14px;margin-bottom:14px}.earningForecastGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.earningForecastMini{background:var(--soft);border-radius:14px;padding:12px}.earningForecastMini small{display:block;color:var(--muted);margin-bottom:5px}.earningForecastMini b{font-size:17px}
 .finActions{padding:0 12px 12px}.finActions .primary{width:100%}
@@ -167,7 +166,7 @@ const GEN=['січня','лютого','березня','квітня','трав
 const HSTART=8,HEND=23,HOURPX=66;
 const KEY='miy_repetytor_v4_2_8';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.3.3';
+const APP_VERSION='4.3.6';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -676,10 +675,20 @@ function renderFinance(){
       </div>
     </div>
     <div class="finGrid">
-      <div class="finCard"><small>Репетиторство</small><b>${money(tutor)}</b></div><div class="finCard"><small>Школа</small><b>${money(schoolIncome)}</b></div>
-      <div class="finCard"><small>Зарплата</small><b>${money(salary)}</b></div><div class="finCard"><small>Аванс</small><b>${money(advance)}</b></div>
-      <div class="finCard"><small>Інше</small><b>${money(other)}</b></div><div class="finCard"><small>Передоплати учнів</small><b>${money(prepaid)}</b></div>
-      <div class="finCard"><small>Борги учнів</small><b>${money(expected)}</b></div><div class="finCard"><small>Проведено занять</small><b>${conducted.length}</b></div>
+      <div class="finCol">
+        <div class="finColTitle">Репетиторство</div>
+        <div class="finCard"><small>Отримано</small><b>${money(tutor)}</b></div>
+        <div class="finCard"><small>Передоплати учнів</small><b>${money(prepaid)}</b></div>
+        <div class="finCard"><small>Борги учнів</small><b>${money(expected)}</b></div>
+        <div class="finCard"><small>Проведено занять</small><b>${conducted.length}</b></div>
+      </div>
+      <div class="finCol">
+        <div class="finColTitle">Школа</div>
+        <div class="finCard"><small>Усього</small><b>${money(schoolIncome)}</b></div>
+        <div class="finCard"><small>Зарплата</small><b>${money(salary)}</b></div>
+        <div class="finCard"><small>Аванс</small><b>${money(advance)}</b></div>
+        <div class="finCard"><small>Інше</small><b>${money(other)}</b></div>
+      </div>
     </div>
     <div class="analytics">
       <div class="analyticsBox"><div class="analyticsTitle">Аналітика</div><div class="metricGrid">
@@ -1049,7 +1058,7 @@ function openCard(id){
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v='+APP_VERSION,{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}));
 }
 let deferredPrompt=null;
 window.addEventListener('beforeinstallprompt',e=>{
