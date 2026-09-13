@@ -152,9 +152,9 @@ const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const MONTHS=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const GEN=['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
 const HSTART=8,HEND=23,HOURPX=66;
-const KEY='miy_repetytor_v4_2_5';
+const KEY='miy_repetytor_v4_2_8';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.2.5';
+const APP_VERSION='4.2.8';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -184,7 +184,10 @@ function load(){
     let x=JSON.parse(localStorage.getItem(KEY)||'null');
     if(x)return x;
     // Якщо користувач уже щось вніс у попередню чисту версію — забираємо дані звідти.
-    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_4')||'null')
+    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_7')||'null')
+      || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_6')||'null')
+      || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_5')||'null')
+      || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_4')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_3')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_2')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_1')||'null')
@@ -203,6 +206,7 @@ function normalizeData(){
   state.data.income ||= [];
   state.data.schoolLessons ||= [];
   state.data.schoolClasses ||= [];
+  state.data.vacations ||= [];
   state.data.students.forEach(s=>{ if(s.autoPay===undefined) s.autoPay=true; });
   state.data.lessons.forEach(l=>{ if(l.seriesId===undefined) l.seriesId=null; if(!l.status) l.status=(lessonMoment(l)<=new Date()?'conducted':'planned'); });
   state.data.schoolLessons.forEach(l=>{ if(l.seriesId===undefined) l.seriesId=null; });
@@ -348,7 +352,7 @@ function renderCalendar(){
         <div class="name">${esc(st.name)}${statusMini}</div><div class="meta">${money(l.price)} <span class="paidmark">${l.paid?'✓':''}</span></div>
       </button>`
     }).join('');
-    const school=state.data.schoolLessons.filter(l=>l.date===d).map(l=>{
+    const school=state.data.schoolLessons.filter(l=>l.date===d && !isVacationDate(l.date,l.classId)).map(l=>{
       const cl=state.data.schoolClasses.find(c=>c.id===l.classId);
       const sub=cl?.subjects?.find(s=>s.id===l.subjectId);
       if(!cl||!sub)return '';
@@ -377,7 +381,7 @@ function renderCalendar(){
 function openToday(){
   const m=document.getElementById('choiceModal'), today=iso(new Date());
   const tutor=state.data.lessons.filter(l=>l.date===today).map(l=>({kind:'tutor',start:l.start,end:l.end,obj:l}));
-  const school=state.data.schoolLessons.filter(l=>l.date===today).map(l=>({kind:'school',start:l.start,end:l.end,obj:l}));
+  const school=state.data.schoolLessons.filter(l=>l.date===today && !isVacationDate(l.date,l.classId)).map(l=>({kind:'school',start:l.start,end:l.end,obj:l}));
   const items=[...tutor,...school].sort((a,b)=>(a.start||'').localeCompare(b.start||''));
   const tutorCount=tutor.length, schoolCount=school.length;
   const d=fromIso(today);
@@ -416,6 +420,7 @@ function openEventChoice(preset={}){
   <div class="mbody"><div class="typeChoice">
     <button class="typeCard" id="chooseTutor"><span>👩‍🏫</span>Додати заняття</button>
     <button class="typeCard" id="chooseSchool"><span>🏫</span>Додати урок</button>
+    <button class="typeCard" id="chooseVacation" style="grid-column:1/-1"><span>🌴</span>Шкільні канікули</button>
   </div></div>`;
   openModal(m,'choice');
   m.querySelector('.close').onclick=()=>closeModal(m);
@@ -427,6 +432,60 @@ function openEventChoice(preset={}){
     if(!state.data.schoolClasses.length)return alert('Спочатку додай клас у вкладці «Класи».');
     m.classList.remove('open'); history.replaceState({tab:state.tab},''); openSchoolLesson(null,preset);
   };
+  document.getElementById('chooseVacation').onclick=()=>{
+    m.classList.remove('open'); history.replaceState({tab:state.tab},''); openVacations(preset.date);
+  };
+}
+function isVacationDate(date,classId){
+  return (state.data.vacations||[]).some(v=>{
+    if(date<v.start || date>v.end)return false;
+    // Старі періоди без classIds вважаємо канікулами для всіх класів.
+    if(!Array.isArray(v.classIds) || !v.classIds.length)return true;
+    return v.classIds.includes(classId);
+  });
+}
+function vacationClassLabel(v){
+  if(!Array.isArray(v.classIds) || !v.classIds.length)return 'Усі класи';
+  const names=v.classIds.map(id=>state.data.schoolClasses.find(c=>c.id===id)?.name).filter(Boolean);
+  return names.length?names.join(', '):'Обрані класи';
+}
+function openVacations(prefillDate=''){
+  const m=document.getElementById('choiceModal');
+  const today=prefillDate||iso(new Date());
+  const classes=state.data.schoolClasses||[];
+  if(!classes.length)return alert('Спочатку додай хоча б один клас у вкладці «Класи».');
+  const rows=[...(state.data.vacations||[])].sort((a,b)=>a.start.localeCompare(b.start)).map(v=>`<div class="history"><div><div class="h1">${esc(v.name||'Шкільні канікули')}</div><div class="h2">${fmt(v.start)} — ${fmt(v.end)}</div><div class="h2">${esc(vacationClassLabel(v))}</div></div><button class="trash" data-del-vac="${v.id}" aria-label="Видалити">🗑</button></div>`).join('');
+  const classChoices=classes.map(cl=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)"><input type="checkbox" data-vac-class value="${cl.id}" checked style="width:20px;height:20px;accent-color:var(--accent)"><span style="font-weight:700">${esc(cl.name)}</span></label>`).join('');
+  m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">Шкільні канікули</div></div>
+    <div class="mbody">
+      <div class="summary">Обери, для яких класів діють ці канікули. Це зручно, якщо класи з різних шкіл мають різні дати. Репетиторські заняття не змінюються.</div>
+      <div><label>Назва</label><input id="vacName" placeholder="Напр. Осінні канікули"></div>
+      <div><label>Від</label><input id="vacStart" type="date" value="${today}"></div>
+      <div><label>До</label><input id="vacEnd" type="date" value="${today}"></div>
+      <div><label>Класи</label><div style="border:1px solid var(--line);border-radius:14px;padding:0 12px;background:#fff">${classChoices}</div>
+        <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="choiceBtn" id="vacAll" style="padding:9px 12px">Вибрати всі</button><button type="button" class="choiceBtn" id="vacNone" style="padding:9px 12px">Очистити</button></div>
+      </div>
+      <button class="primary" id="saveVacation">Додати канікули</button>
+      ${rows?`<div class="section">Збережені канікули</div>${rows}`:''}
+    </div>`;
+  openModal(m,'vacations');
+  m.querySelector('.close').onclick=()=>closeModal(m);
+  document.getElementById('vacAll').onclick=()=>m.querySelectorAll('[data-vac-class]').forEach(x=>x.checked=true);
+  document.getElementById('vacNone').onclick=()=>m.querySelectorAll('[data-vac-class]').forEach(x=>x.checked=false);
+  document.getElementById('saveVacation').onclick=()=>{
+    const start=document.getElementById('vacStart').value,end=document.getElementById('vacEnd').value;
+    if(!start||!end)return alert('Обери початок і кінець.');
+    if(end<start)return alert('Дата завершення не може бути раніше початку.');
+    const classIds=[...m.querySelectorAll('[data-vac-class]:checked')].map(x=>x.value);
+    if(!classIds.length)return alert('Обери хоча б один клас.');
+    state.data.vacations.push({id:uid(),name:document.getElementById('vacName').value.trim()||'Шкільні канікули',start,end,classIds});
+    save(); m.classList.remove('open'); history.replaceState({tab:state.tab},''); render();
+  };
+  m.querySelectorAll('[data-del-vac]').forEach(b=>b.onclick=()=>{
+    if(!confirm('Видалити ці канікули? Уроки вибраних класів знову з’являться у календарі.'))return;
+    state.data.vacations=state.data.vacations.filter(v=>v.id!==b.dataset.delVac);
+    save(); openVacations(today); render();
+  });
 }
 function renderStudents(){
   document.getElementById('topbar').innerHTML='';
