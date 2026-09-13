@@ -133,8 +133,9 @@ const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const MONTHS=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const GEN=['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
 const HSTART=8,HEND=23,HOURPX=66;
-const KEY='miy_repetytor_v4_2';
+const KEY='miy_repetytor_v4_2_1';
 const TABKEY='miy_repetytor_active_tab';
+const APP_VERSION='4.2.1';
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -151,7 +152,8 @@ function load(){
     let x=JSON.parse(localStorage.getItem(KEY)||'null');
     if(x)return x;
     // Якщо користувач уже щось вніс у попередню чисту версію — забираємо дані звідти.
-    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4')||'null')
+    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2')||'null')
+      || JSON.parse(localStorage.getItem('miy_repetytor_v4')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v3')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v2_clean')||'null');
     if(old)return old;
@@ -214,20 +216,31 @@ history.replaceState({tab:state.tab},'');
 
 function processAutoPay(){
   const now=new Date();
+  let changed=false;
+
   state.data.students.forEach(st=>{
     if(st.autoPay===false)return;
-    let z=stats(st.id), balance=z.balance;
+
+    // Recalculate from payment pool minus already-paid lessons.
+    let z=stats(st.id);
+    let available=Math.max(0,z.balance);
+
     const eligible=state.data.lessons
       .filter(l=>l.studentId===st.id && !l.paid && lessonMoment(l)<=now)
-      .sort((a,b)=>(a.date+a.end).localeCompare(b.date+b.end));
+      .sort((a,b)=>(a.date+(a.end||'')).localeCompare(b.date+(b.end||'')));
+
     eligible.forEach(l=>{
-      const price=Number(l.price)||0;
-      if(price>0 && balance>=price){
-        l.paid=true; l.autoPaid=true; balance-=price;
+      const price=Number(l.price||0);
+      if(price>0 && available>=price){
+        l.paid=true;
+        l.autoPaid=true;
+        available-=price;
+        changed=true;
       }
     });
   });
-  localStorage.setItem(KEY,JSON.stringify(state.data));
+
+  if(changed)localStorage.setItem(KEY,JSON.stringify(state.data));
 }
 function lessonMoment(l){
   const d=fromIso(l.date), [h,m]=(l.end||l.start||'00:00').split(':').map(Number);
@@ -383,8 +396,10 @@ function openClassEditor(cl=null){
 
 function renderFinance(){
   const now=new Date(), ym=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
-  const tutor=state.data.payments.filter(p=>p.date.startsWith(ym)).reduce((a,p)=>a+Number(p.amount),0);
-  const inc=state.data.income.filter(x=>x.date.startsWith(ym));
+  const tutor=state.data.payments
+    .filter(p=>String(p.date||'').slice(0,7)===ym)
+    .reduce((a,p)=>a+Number(p.amount||0),0);
+  const inc=state.data.income.filter(x=>String(x.date||'').slice(0,7)===ym);
   const salary=inc.filter(x=>x.type==='salary').reduce((a,x)=>a+Number(x.amount),0);
   const advance=inc.filter(x=>x.type==='advance').reduce((a,x)=>a+Number(x.amount),0);
   const other=inc.filter(x=>x.type==='other').reduce((a,x)=>a+Number(x.amount),0);
@@ -392,7 +407,7 @@ function renderFinance(){
   const prepaid=state.data.students.reduce((a,s)=>a+Math.max(0,stats(s.id).balance),0);
   const expected=state.data.students.reduce((a,s)=>a+stats(s.id).unpaid,0);
   const history=[
-    ...state.data.payments.map(p=>({date:p.date,amount:p.amount,label:`Репетиторство · ${student(p.studentId)?.name||'Учень'}`})),
+    ...state.data.payments.map(p=>({date:p.date,amount:Number(p.amount||0),label:`Репетиторство · ${student(p.studentId)?.name||'Учень'}`})),
     ...state.data.income.map(x=>({date:x.date,amount:x.amount,label:x.type==='salary'?'Зарплата':x.type==='advance'?'Аванс':x.note||'Інший дохід'}))
   ].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
   document.getElementById('topbar').innerHTML='';
