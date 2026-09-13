@@ -89,6 +89,7 @@ textarea{min-height:80px;resize:vertical}
 .finGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
 .finCard{background:#fff;border-radius:14px;padding:14px}
 .finCard small{color:var(--muted)}.finCard b{display:block;font-size:19px;margin-top:5px}
+.earningForecast{margin:12px;background:#fff;border-radius:18px;padding:16px}.earningForecastTitle{font-size:20px;margin-bottom:14px}.earningForecastMain{font-size:31px;margin-bottom:4px}.earningForecastSub{color:var(--muted);font-size:14px;margin-bottom:14px}.earningForecastGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.earningForecastMini{background:var(--soft);border-radius:14px;padding:12px}.earningForecastMini small{display:block;color:var(--muted);margin-bottom:5px}.earningForecastMini b{font-size:17px}
 .finActions{padding:0 12px 12px}.finActions .primary{width:100%}
 .finHistory{background:#fff;padding:0 16px}.finTitle{font-size:18px;font-weight:850;padding:14px 0 6px}
 
@@ -665,13 +666,20 @@ function renderFinance(){
       <div class="finPeriodNav"><button id="finPrev">‹</button><div class="finPeriodLabel">${periodTitle}</div><button id="finNext">›</button></div>
       <div class="finTotal">${money(total)}</div><div class="summary">Отриманий дохід за ${mode==='month'?'період':'рік'}</div></div>
     <div class="finToggle"><button data-finmode="month" class="${mode==='month'?'active':''}">Місяць</button><button data-finmode="year" class="${mode==='year'?'active':''}">Рік</button></div>
+    <div class="earningForecast">
+      <div class="earningForecastTitle">${mode==='month'?'План заробітку за місяць':'План заробітку за рік'}</div>
+      <div class="earningForecastMain">${money(possibleEarnings)}</div>
+      <div class="earningForecastSub">${earningPlanLessons.length} занять у розкладі · скасовані не враховуються</div>
+      <div class="earningForecastGrid">
+        <div class="earningForecastMini"><small>Проведено</small><b>${conducted.length} · ${money(conductedValue)}</b></div>
+        <div class="earningForecastMini"><small>Залишилось за планом</small><b>${plannedLessons.length} · ${money(remainingPlanValue)}</b></div>
+      </div>
+    </div>
     <div class="finGrid">
       <div class="finCard"><small>Репетиторство</small><b>${money(tutor)}</b></div><div class="finCard"><small>Школа</small><b>${money(schoolIncome)}</b></div>
       <div class="finCard"><small>Зарплата</small><b>${money(salary)}</b></div><div class="finCard"><small>Аванс</small><b>${money(advance)}</b></div>
       <div class="finCard"><small>Інше</small><b>${money(other)}</b></div><div class="finCard"><small>Передоплати учнів</small><b>${money(prepaid)}</b></div>
       <div class="finCard"><small>Борги учнів</small><b>${money(expected)}</b></div><div class="finCard"><small>Проведено занять</small><b>${conducted.length}</b></div>
-      <div class="finCard"><small>${mode==='month'?'Можливий заробіток за місяць':'Плановий дохід за рік'}</small><b>${money(possibleEarnings)}</b></div>
-      <div class="finCard"><small>Залишилось за планом</small><b>${plannedLessons.length} · ${money(remainingPlanValue)}</b></div>
     </div>
     <div class="analytics">
       <div class="analyticsBox"><div class="analyticsTitle">Аналітика</div><div class="metricGrid">
