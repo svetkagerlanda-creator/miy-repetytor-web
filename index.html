@@ -103,6 +103,23 @@ textarea{min-height:80px;resize:vertical}
 .typeCard span{display:block;font-size:26px;margin-bottom:8px}
 .repeatUntil{display:none;margin-top:10px}
 
+.todayPill{border:1px solid #ddd8ff;background:#f5f2ff;color:var(--accent);border-radius:999px;padding:9px 12px;font-weight:850;font-size:12px}
+.todayActions{display:flex;align-items:center;gap:8px}
+.todayWrap{padding:0 16px 24px;overflow:auto}
+.todayDate{font-size:13px;color:var(--muted);margin-top:2px}
+.todaySummary{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.todaySummary span{background:#f4f4f8;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:750}
+.todayItem{border:1px solid var(--line);border-left:5px solid var(--item-color,#64748b);border-radius:14px;padding:12px;margin-bottom:10px;background:#fff}
+.todayItem.cancelled{opacity:.58}
+.todayRow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.todayTime{font-weight:900;font-size:14px;white-space:nowrap}
+.todayName{font-weight:900;font-size:15px}
+.todaySub{font-size:12px;color:var(--muted);margin-top:3px}
+.statusSelect{margin-top:10px;min-height:40px;padding:9px 10px;background:#fafafa}
+.statusTag{display:inline-block;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:850;margin-top:7px;background:#f1f1f5;color:#666}
+.statusTag.conducted{background:#dcfce7;color:#15803d}.statusTag.cancelled{background:#fee2e2;color:#b91c1c}.statusTag.no_show{background:#fff7d6;color:#a16207}.statusTag.planned{background:#eeeafc;color:#6c4cff}
+.lesson.cancelled{opacity:.45;text-decoration:line-through}.lesson.no_show{outline:2px solid #f59e0b;outline-offset:-2px}
+
 </style>
 </head>
 <body>
@@ -133,9 +150,9 @@ const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const MONTHS=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const GEN=['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
 const HSTART=8,HEND=23,HOURPX=66;
-const KEY='miy_repetytor_v4_2_4';
+const KEY='miy_repetytor_v4_2_5';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.2.4';
+const APP_VERSION='4.2.5';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -146,6 +163,9 @@ const COLOR_OPTIONS=[
 ];
 const colorOptionsHtml=(selected)=>COLOR_OPTIONS.map(([hex,name])=>`<option value="${hex}" ${hex.toLowerCase()===(selected||'').toLowerCase()?'selected':''}>● ${name}</option>`).join('');
 const contrastText=hex=>{const h=(hex||'#64748b').replace('#',''); if(h.length!==6)return '#fff'; const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16); return (r*299+g*587+b*114)/1000>165?'#17171b':'#fff';};
+const TUTOR_STATUSES={planned:'Заплановано',conducted:'Проведено',cancelled:'Скасовано',no_show:'Не прийшов'};
+const statusOptionsHtml=(selected='planned')=>Object.entries(TUTOR_STATUSES).map(([v,n])=>`<option value="${v}" ${v===selected?'selected':''}>${n}</option>`).join('');
+const statusLabel=v=>TUTOR_STATUSES[v]||TUTOR_STATUSES.planned;
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -162,7 +182,8 @@ function load(){
     let x=JSON.parse(localStorage.getItem(KEY)||'null');
     if(x)return x;
     // Якщо користувач уже щось вніс у попередню чисту версію — забираємо дані звідти.
-    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_3')||'null')
+    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_4')||'null')
+      || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_3')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_2')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_1')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2')||'null')
@@ -181,7 +202,7 @@ function normalizeData(){
   state.data.schoolLessons ||= [];
   state.data.schoolClasses ||= [];
   state.data.students.forEach(s=>{ if(s.autoPay===undefined) s.autoPay=true; });
-  state.data.lessons.forEach(l=>{ if(l.seriesId===undefined) l.seriesId=null; });
+  state.data.lessons.forEach(l=>{ if(l.seriesId===undefined) l.seriesId=null; if(!l.status) l.status=(lessonMoment(l)<=new Date()?'conducted':'planned'); });
   state.data.schoolLessons.forEach(l=>{ if(l.seriesId===undefined) l.seriesId=null; });
 }
 function reconcileDirectLessonPayments(){
@@ -221,7 +242,7 @@ function stats(id){
   const ls=state.data.lessons.filter(l=>l.studentId===id);
   const received=ps.reduce((a,p)=>a+Number(p.amount||0),0);
   const now=new Date();
-  const dueLessons=ls.filter(l=>lessonMoment(l)<=now);
+  const dueLessons=ls.filter(l=>l.status!=='cancelled' && lessonMoment(l)<=now);
   const dueTotal=dueLessons.reduce((a,l)=>a+Number(l.price||0),0);
   const paidMarked=dueLessons.filter(l=>l.paid).reduce((a,l)=>a+Number(l.price||0),0);
   // Єдиний баланс учня: отримані гроші мінус усі заняття, що вже відбулися.
@@ -274,7 +295,7 @@ function processAutoPay(){
     let available=Math.max(0,z.received-z.spent);
 
     const eligible=state.data.lessons
-      .filter(l=>l.studentId===st.id && !l.paid && lessonMoment(l)<=now)
+      .filter(l=>l.studentId===st.id && l.status!=='cancelled' && !l.paid && lessonMoment(l)<=now)
       .sort((a,b)=>(a.date+(a.end||'')).localeCompare(b.date+(b.end||'')));
 
     eligible.forEach(l=>{
@@ -301,11 +322,12 @@ function renderCalendar(){
     <div><button id="todayBtn" style="border:0;background:transparent;padding:0;text-align:left"><div class="month">${MONTHS[week.getMonth()]}</div></button>
       <div class="weeknav"><button class="iconbtn" id="prevW">‹</button><span>${week.getDate()} – ${end.getDate()} ${GEN[end.getMonth()]}</span><button class="iconbtn" id="nextW">›</button></div>
     </div>
-    <div><button class="fab" id="addEvent">+</button></div>`;
+    <div class="todayActions"><button class="todayPill" id="openToday">Сьогодні</button><button class="fab" id="addEvent">+</button></div>`;
   document.getElementById('todayBtn').onclick=()=>{state.week=startWeek(new Date());render()};
   document.getElementById('prevW').onclick=()=>{state.week=addDays(state.week,-7);render()};
   document.getElementById('nextW').onclick=()=>{state.week=addDays(state.week,7);render()};
   document.getElementById('addEvent').onclick=()=>openEventChoice();
+  document.getElementById('openToday').onclick=()=>openToday();
 
   let heads='<div class="timeHead"></div>';
   for(let i=0;i<7;i++){let d=addDays(week,i);heads+=`<div class="dayhead"><div class="n">${d.getDate()}</div><div class="d">${DAYS[i]}</div></div>`}
@@ -318,8 +340,10 @@ function renderCalendar(){
       const st=student(l.studentId);if(!st)return '';
       const top=(mins(l.start)-HSTART*60)/60;
       const dur=Math.max(.35,(mins(l.end)-mins(l.start))/60);
-      return `<button class="lesson" data-kind="tutor" data-id="${l.id}" style="top:calc(var(--hour) * ${top});height:calc(var(--hour) * ${dur} - 2px);background:${st.color}">
-        <div class="name">${esc(st.name)}</div><div class="meta">${money(l.price)} <span class="paidmark">${l.paid?'✓':''}</span></div>
+      const statusClass=l.status==='cancelled'?' cancelled':l.status==='no_show'?' no_show':'';
+      const statusMini=l.status==='cancelled'?' · ×':l.status==='no_show'?' · !':'';
+      return `<button class="lesson${statusClass}" data-kind="tutor" data-id="${l.id}" style="top:calc(var(--hour) * ${top});height:calc(var(--hour) * ${dur} - 2px);background:${st.color}">
+        <div class="name">${esc(st.name)}${statusMini}</div><div class="meta">${money(l.price)} <span class="paidmark">${l.paid?'✓':''}</span></div>
       </button>`
     }).join('');
     const school=state.data.schoolLessons.filter(l=>l.date===d).map(l=>{
@@ -348,6 +372,42 @@ function renderCalendar(){
     openEventChoice({date:col.dataset.date,start:`${hh}:${mm}`,end:`${pad(Math.floor(endM/60))}:${pad(endM%60)}`});
   });
 }
+function openToday(){
+  const m=document.getElementById('choiceModal'), today=iso(new Date());
+  const tutor=state.data.lessons.filter(l=>l.date===today).map(l=>({kind:'tutor',start:l.start,end:l.end,obj:l}));
+  const school=state.data.schoolLessons.filter(l=>l.date===today).map(l=>({kind:'school',start:l.start,end:l.end,obj:l}));
+  const items=[...tutor,...school].sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const tutorCount=tutor.length, schoolCount=school.length;
+  const d=fromIso(today);
+  const cards=items.map(it=>{
+    if(it.kind==='tutor'){
+      const l=it.obj,st=student(l.studentId); if(!st)return '';
+      return `<div class="todayItem ${l.status==='cancelled'?'cancelled':''}" style="--item-color:${st.color}">
+        <div class="todayRow"><div><div class="todayName">${esc(st.name)}</div><div class="todaySub">${money(l.price)} · ${l.paid?'Оплачено':'Не оплачено'}</div></div><div class="todayTime">${l.start}–${l.end}</div></div>
+        <span class="statusTag ${l.status||'planned'}">${statusLabel(l.status)}</span>
+        <select class="statusSelect" data-today-status="${l.id}">${statusOptionsHtml(l.status||'planned')}</select>
+        <button class="choiceBtn" style="margin-top:8px;padding:10px" data-open-tutor="${l.id}">Відкрити заняття</button>
+      </div>`;
+    }
+    const l=it.obj,cl=state.data.schoolClasses.find(c=>c.id===l.classId),sub=cl?.subjects?.find(s=>s.id===l.subjectId); if(!cl||!sub)return '';
+    return `<div class="todayItem" style="--item-color:${sub.color||'#64748b'}">
+      <div class="todayRow"><div><div class="todayName">${esc(cl.name)} · ${esc(sub.name)}</div><div class="todaySub">${l.mode==='remote'?'💻 Дистанційно':'🏫 Очно'}</div></div><div class="todayTime">${l.start}–${l.end}</div></div>
+      <button class="choiceBtn" style="margin-top:8px;padding:10px" data-open-school="${l.id}">Відкрити урок</button>
+    </div>`;
+  }).join('');
+  m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">Сьогодні</div></div>
+    <div class="todayWrap"><div class="todayDate">${d.getDate()} ${GEN[d.getMonth()]} ${d.getFullYear()}</div>
+    <div class="todaySummary"><span>🏫 ${schoolCount} уроків</span><span>👩‍🏫 ${tutorCount} занять</span></div>
+    ${cards||'<div class="emptyState" style="height:55vh"><b>На сьогодні нічого немає</b><span>Можна трохи видихнути 🙂</span></div>'}</div>`;
+  openModal(m,'today'); m.querySelector('.close').onclick=()=>closeModal(m);
+  m.querySelectorAll('[data-today-status]').forEach(sel=>sel.onchange=()=>{
+    const l=state.data.lessons.find(x=>x.id===sel.dataset.todayStatus); if(!l)return;
+    l.status=sel.value; save(); openToday(); render();
+  });
+  m.querySelectorAll('[data-open-tutor]').forEach(b=>b.onclick=()=>{m.classList.remove('open');history.replaceState({tab:state.tab},'');openTutorLesson(state.data.lessons.find(x=>x.id===b.dataset.openTutor))});
+  m.querySelectorAll('[data-open-school]').forEach(b=>b.onclick=()=>{m.classList.remove('open');history.replaceState({tab:state.tab},'');openSchoolLesson(state.data.schoolLessons.find(x=>x.id===b.dataset.openSchool))});
+}
+
 function openEventChoice(preset={}){
   const m=document.getElementById('choiceModal');
   m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">Що додати?</div></div>
@@ -501,7 +561,7 @@ function repeatDates(startDate,untilDate){
 function openTutorLesson(l=null,preset={}){
   const m=document.getElementById('lessonModal');
   const st0=l?student(l.studentId):state.data.students[0];
-  const val={studentId:l?.studentId||st0?.id||'',price:l?.price??st0?.price??350,date:l?.date||preset.date||iso(new Date()),start:l?.start||preset.start||'16:00',end:l?.end||preset.end||'17:00',note:l?.note||'',paid:!!l?.paid};
+  const val={studentId:l?.studentId||st0?.id||'',price:l?.price??st0?.price??350,date:l?.date||preset.date||iso(new Date()),start:l?.start||preset.start||'16:00',end:l?.end||preset.end||'17:00',note:l?.note||'',paid:!!l?.paid,status:l?.status||'planned'};
   m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">${l?'Заняття':'Додати заняття'}</div>${l?'<button class="trash">🗑</button>':''}</div>
   <div class="mbody">
     <div><label>Учень</label><select id="lfStudent">${state.data.students.map(s=>`<option value="${s.id}" ${s.id===val.studentId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
@@ -510,6 +570,7 @@ function openTutorLesson(l=null,preset={}){
     <div class="row2"><div><label>Початок</label><input id="lfStart" type="time" value="${val.start}"></div><div><label>Кінець</label><input id="lfEnd" type="time" value="${val.end}"></div></div>
     ${!l?`<div class="switchrow"><span><b>Повторювати щотижня</b><br><small style="color:var(--muted)">До вибраної дати</small></span><input id="lfRepeat" type="checkbox" style="width:auto;min-height:auto"></div>
       <div id="repeatUntil" class="repeatUntil"><label>Повторювати до</label><input id="lfRepeatUntil" type="date" value="${repeatUntilDefault(val.date)}"></div>`:''}
+    <div><label>Статус</label><select id="lfStatus">${statusOptionsHtml(val.status)}</select></div>
     <div><label>Примітка</label><textarea id="lfNote" placeholder="Необов’язково">${esc(val.note)}</textarea></div>
     ${l?`<div class="paybox"><b>Оплата</b><button id="paidBtn" class="pill" style="background:${val.paid?'#dcfce7':'#fee2e2'};color:${val.paid?'#15803d':'#b91c1c'}">${val.paid?'Оплачено':'Не оплачено'}</button></div>`:''}
     <button class="primary" id="saveLesson">Зберегти</button>
@@ -524,7 +585,7 @@ function openTutorLesson(l=null,preset={}){
   if(l)document.getElementById('paidBtn').onclick=()=>{paid=!paid;const b=document.getElementById('paidBtn');b.textContent=paid?'Оплачено':'Не оплачено';b.style.background=paid?'#dcfce7':'#fee2e2';b.style.color=paid?'#15803d':'#b91c1c'};
   document.getElementById('lfStudent').onchange=e=>{const st=student(e.target.value);if(st&&!l)document.getElementById('lfPrice').value=st.price};
   document.getElementById('saveLesson').onclick=()=>{
-    const obj={id:l?.id||uid(),studentId:document.getElementById('lfStudent').value,price:Number(document.getElementById('lfPrice').value||0),date:document.getElementById('lfDate').value,start:document.getElementById('lfStart').value,end:document.getElementById('lfEnd').value,note:document.getElementById('lfNote').value.trim(),paid,autoPaid:l?.autoPaid||false,seriesId:l?.seriesId||null,paidAt:l?.paidAt||null};
+    const obj={id:l?.id||uid(),studentId:document.getElementById('lfStudent').value,price:Number(document.getElementById('lfPrice').value||0),date:document.getElementById('lfDate').value,start:document.getElementById('lfStart').value,end:document.getElementById('lfEnd').value,note:document.getElementById('lfNote').value.trim(),status:document.getElementById('lfStatus').value,paid,autoPaid:l?.autoPaid||false,seriesId:l?.seriesId||null,paidAt:l?.paidAt||null};
     if(mins(obj.end)<=mins(obj.start))return alert('Час завершення має бути пізніше за початок.');
     if(l){
       // Ручна ✓ = гроші реально отримані. Створюємо одне пов'язане надходження.
@@ -536,7 +597,7 @@ function openTutorLesson(l=null,preset={}){
       if(document.getElementById('lfRepeat')?.checked){
         const until=document.getElementById('lfRepeatUntil').value;
         if(!until||until<obj.date)return alert('Перевір дату завершення повторення.');
-        const sid=uid();repeatDates(obj.date,until).forEach(date=>state.data.lessons.push({...obj,id:uid(),date,seriesId:sid,paid:false,autoPaid:false}));
+        const sid=uid();repeatDates(obj.date,until).forEach(date=>state.data.lessons.push({...obj,id:uid(),date,seriesId:sid,paid:false,autoPaid:false,status:'planned'}));
       }else state.data.lessons.push(obj);
       save();finishModalSave(m);return;
     }
@@ -621,12 +682,12 @@ function editTutorSeries(old,obj,parent){
       items.filter(x=>x.date>=old.date).forEach(x=>{
         const weeks=Math.round((fromIso(x.date)-oldBase)/(7*86400000));
         Object.assign(x,{studentId:obj.studentId,price:obj.price,start:obj.start,end:obj.end,note:obj.note,date:iso(addDays(base,weeks*7))});
-        if(x.id===old.id){x.paid=obj.paid;x.autoPaid=obj.autoPaid}
+        if(x.id===old.id){x.paid=obj.paid;x.autoPaid=obj.autoPaid;x.status=obj.status}
       });
     }else{
       const delta=Math.round((fromIso(obj.date)-fromIso(old.date))/86400000);
       items.forEach(x=>{x.studentId=obj.studentId;x.price=obj.price;x.start=obj.start;x.end=obj.end;x.note=obj.note;x.date=iso(addDays(fromIso(x.date),delta))});
-      const clicked=state.data.lessons.find(x=>x.id===old.id);if(clicked){clicked.paid=obj.paid;clicked.autoPaid=obj.autoPaid}
+      const clicked=state.data.lessons.find(x=>x.id===old.id);if(clicked){clicked.paid=obj.paid;clicked.autoPaid=obj.autoPaid;clicked.status=obj.status}
     }
     save();render();
   });
@@ -699,7 +760,7 @@ function openCard(id){
   <div class="summary" style="margin-top:-8px">${z.balance>0?'Передоплата':z.balance<0?'Борг':'Розраховано'}</div>
   <div class="section">Внести оплату</div><div><label>Сума</label><input id="payAmount" type="number" placeholder="1400"></div><div><label>Коментар</label><input id="payNote" placeholder="Напр. Mono, за вересень"></div><button class="primary" id="addPay">Додати оплату</button>
   <div class="section">Останні оплати</div>${ps.length?ps.map(p=>`<div class="history"><div><div class="h1">${esc(p.note||'Оплата')}</div><div class="h2">${fmt(p.date)}</div></div><b style="color:var(--good)">+${money(p.amount)}</b></div>`).join(''):'<div class="empty">Оплат ще немає</div>'}
-  <div class="section">Останні заняття</div>${ls.length?ls.map(l=>`<div class="history"><div><div class="h1">${fmt(l.date)} · ${l.start}</div><div class="h2">${esc(l.note||'Заняття')}</div></div><b style="color:${l.paid?'var(--good)':'var(--bad)'}">${l.paid?'Оплачено':'Не оплачено'}</b></div>`).join(''):'<div class="empty">Занять ще немає</div>'}</div>`;
+  <div class="section">Останні заняття</div>${ls.length?ls.map(l=>`<div class="history"><div><div class="h1">${fmt(l.date)} · ${l.start}</div><div class="h2">${esc(l.note||'Заняття')} · ${statusLabel(l.status)}</div></div><b style="color:${l.paid?'var(--good)':'var(--bad)'}">${l.paid?'Оплачено':'Не оплачено'}</b></div>`).join(''):'<div class="empty">Занять ще немає</div>'}</div>`;
   openModal(m,'income');m.querySelector('.close').onclick=()=>closeModal(m);
   document.getElementById('editSt').onclick=()=>{m.classList.remove('open');openStudent(st)};
   document.getElementById('addPay').onclick=()=>{const a=Number(document.getElementById('payAmount').value||0);if(a<=0)return alert('Введи суму');state.data.payments.push({id:uid(),studentId:id,amount:a,date:iso(new Date()),note:document.getElementById('payNote').value.trim()});save();m.classList.remove('open');openCard(id);render()};
