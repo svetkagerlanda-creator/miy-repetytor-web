@@ -133,9 +133,9 @@ const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const MONTHS=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const GEN=['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
 const HSTART=8,HEND=23,HOURPX=66;
-const KEY='miy_repetytor_v4_2_2';
+const KEY='miy_repetytor_v4_2_3';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.2.1';
+const APP_VERSION='4.2.3';
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -152,7 +152,8 @@ function load(){
     let x=JSON.parse(localStorage.getItem(KEY)||'null');
     if(x)return x;
     // Якщо користувач уже щось вніс у попередню чисту версію — забираємо дані звідти.
-    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_1')||'null')
+    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_2')||'null')
+      || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_1')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v3')||'null')
@@ -171,6 +172,36 @@ function normalizeData(){
   state.data.students.forEach(s=>{ if(s.autoPay===undefined) s.autoPay=true; });
   state.data.lessons.forEach(l=>{ if(l.seriesId===undefined) l.seriesId=null; });
   state.data.schoolLessons.forEach(l=>{ if(l.seriesId===undefined) l.seriesId=null; });
+}
+function reconcileDirectLessonPayments(){
+  // Старі вручну позначені як «Оплачено» заняття перетворюємо на реальні надходження.
+  // Автооплачені з уже внесеної передоплати тут НЕ дублюємо.
+  let changed=false;
+  state.data.lessons.forEach(l=>{
+    if(l.paid && !l.autoPaid){
+      const exists=state.data.payments.some(p=>p.lessonId===l.id && p.source==='lesson');
+      if(!exists){
+        state.data.payments.push({id:uid(),studentId:l.studentId,amount:Number(l.price||0),date:l.paidAt||l.date||iso(new Date()),note:'Оплата заняття',source:'lesson',lessonId:l.id});
+        l.paidAt=l.paidAt||l.date||iso(new Date());
+        changed=true;
+      }
+    }
+  });
+  if(changed)localStorage.setItem(KEY,JSON.stringify(state.data));
+}
+function ensureLessonPayment(l){
+  let p=state.data.payments.find(p=>p.lessonId===l.id && p.source==='lesson');
+  if(!p){
+    p={id:uid(),studentId:l.studentId,amount:Number(l.price||0),date:l.paidAt||iso(new Date()),note:'Оплата заняття',source:'lesson',lessonId:l.id};
+    state.data.payments.push(p);
+  }else{
+    p.studentId=l.studentId;
+    p.amount=Number(l.price||0);
+    p.date=l.paidAt||p.date||iso(new Date());
+  }
+}
+function removeLessonPayment(lessonId){
+  state.data.payments=state.data.payments.filter(p=>!(p.lessonId===lessonId && p.source==='lesson'));
 }
 function save(){normalizeData();localStorage.setItem(KEY,JSON.stringify(state.data))}
 function student(id){return state.data.students.find(s=>s.id===id)}
@@ -411,7 +442,7 @@ function renderFinance(){
   const prepaid=state.data.students.reduce((a,s)=>a+stats(s.id).prepaid,0);
   const expected=state.data.students.reduce((a,s)=>a+stats(s.id).debt,0);
   const history=[
-    ...state.data.payments.map(p=>({date:p.date,amount:Number(p.amount||0),label:`Репетиторство · ${student(p.studentId)?.name||'Учень'}`})),
+    ...state.data.payments.map(p=>({date:p.date,amount:Number(p.amount||0),label:`Репетиторство · ${student(p.studentId)?.name||'Учень'}${p.source==='lesson'?' · заняття':''}`})),
     ...state.data.income.map(x=>({date:x.date,amount:x.amount,label:x.type==='salary'?'Зарплата':x.type==='advance'?'Аванс':x.note||'Інший дохід'}))
   ].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
   document.getElementById('topbar').innerHTML='';
@@ -481,8 +512,14 @@ function openTutorLesson(l=null,preset={}){
   if(l)document.getElementById('paidBtn').onclick=()=>{paid=!paid;const b=document.getElementById('paidBtn');b.textContent=paid?'Оплачено':'Не оплачено';b.style.background=paid?'#dcfce7':'#fee2e2';b.style.color=paid?'#15803d':'#b91c1c'};
   document.getElementById('lfStudent').onchange=e=>{const st=student(e.target.value);if(st&&!l)document.getElementById('lfPrice').value=st.price};
   document.getElementById('saveLesson').onclick=()=>{
-    const obj={id:l?.id||uid(),studentId:document.getElementById('lfStudent').value,price:Number(document.getElementById('lfPrice').value||0),date:document.getElementById('lfDate').value,start:document.getElementById('lfStart').value,end:document.getElementById('lfEnd').value,note:document.getElementById('lfNote').value.trim(),paid,autoPaid:l?.autoPaid||false,seriesId:l?.seriesId||null};
+    const obj={id:l?.id||uid(),studentId:document.getElementById('lfStudent').value,price:Number(document.getElementById('lfPrice').value||0),date:document.getElementById('lfDate').value,start:document.getElementById('lfStart').value,end:document.getElementById('lfEnd').value,note:document.getElementById('lfNote').value.trim(),paid,autoPaid:l?.autoPaid||false,seriesId:l?.seriesId||null,paidAt:l?.paidAt||null};
     if(mins(obj.end)<=mins(obj.start))return alert('Час завершення має бути пізніше за початок.');
+    if(l){
+      // Ручна ✓ = гроші реально отримані. Створюємо одне пов'язане надходження.
+      if(obj.paid && !l.paid){ obj.autoPaid=false; obj.paidAt=iso(new Date()); ensureLessonPayment(obj); }
+      else if(!obj.paid && l.paid && !l.autoPaid){ removeLessonPayment(l.id); obj.autoPaid=false; obj.paidAt=null; }
+      else if(obj.paid && !obj.autoPaid){ obj.paidAt=obj.paidAt||l.date||iso(new Date()); ensureLessonPayment(obj); }
+    }
     if(!l){
       if(document.getElementById('lfRepeat')?.checked){
         const until=document.getElementById('lfRepeatUntil').value;
@@ -603,11 +640,13 @@ function editSchoolSeries(old,obj,parent){
 }
 function deleteTutorLesson(l,parent){
   if(!l.seriesId){
-    if(confirm('Видалити це заняття?')){state.data.lessons=state.data.lessons.filter(x=>x.id!==l.id);save();finishModalSave(parent)}
+    if(confirm('Видалити це заняття?')){removeLessonPayment(l.id);state.data.lessons=state.data.lessons.filter(x=>x.id!==l.id);save();finishModalSave(parent)}
     return;
   }
   parent.classList.remove('open');history.replaceState({tab:state.tab},'');
   chooseSeries('Видалити повторюване заняття',scope=>{
+    const doomed=state.data.lessons.filter(x=>scope==='one'?x.id===l.id:scope==='following'?(x.seriesId===l.seriesId&&x.date>=l.date):x.seriesId===l.seriesId).map(x=>x.id);
+    doomed.forEach(removeLessonPayment);
     if(scope==='one')state.data.lessons=state.data.lessons.filter(x=>x.id!==l.id);
     if(scope==='following')state.data.lessons=state.data.lessons.filter(x=>!(x.seriesId===l.seriesId&&x.date>=l.date));
     if(scope==='all')state.data.lessons=state.data.lessons.filter(x=>x.seriesId!==l.seriesId);
@@ -672,6 +711,7 @@ document.getElementById('installNow').onclick=async()=>{
 document.getElementById('installClose').onclick=()=>document.getElementById('installBar').classList.remove('show');
 
 normalizeData();
+reconcileDirectLessonPayments();
 render();
 </script>
 </body>
