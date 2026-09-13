@@ -130,6 +130,9 @@ textarea{min-height:80px;resize:vertical}
 .lesson.cancelled{opacity:.45;text-decoration:line-through}.lesson.no_show{outline:2px solid #f59e0b;outline-offset:-2px}
 .moreBtn{border:0;background:#f3f1ff;color:var(--accent);width:38px;height:38px;border-radius:50%;font-size:24px;line-height:34px;font-weight:800;padding:0}.headerActions{display:flex;align-items:center;gap:8px}.menuList{display:flex;flex-direction:column;gap:8px}.menuItem{width:100%;border:1px solid var(--line);background:#fff;border-radius:13px;padding:14px;text-align:left;font-weight:800}.menuItem small{display:block;color:var(--muted);font-weight:500;margin-top:4px}.menuItem.danger{color:var(--bad)}.aboutBox{background:#f7f7fb;border-radius:14px;padding:14px;font-size:13px;line-height:1.5;color:#555}.aboutBox b{color:var(--text)}
 
+
+.finPeriodNav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}.finPeriodNav button{border:1px solid var(--line);background:#fff;border-radius:10px;width:38px;height:38px;font-size:20px}.finPeriodLabel{font-weight:850;text-align:center;flex:1}.finToggle{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#f0eef9;padding:4px;border-radius:12px;margin:12px}.finToggle button{border:0;background:transparent;border-radius:9px;padding:9px;font-weight:800;color:var(--muted)}.finToggle button.active{background:#fff;color:var(--accent);box-shadow:0 1px 4px #0001}.analytics{padding:0 12px 18px}.analyticsBox{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px}.analyticsTitle{font-weight:900;font-size:16px;margin-bottom:12px}.metricGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric{background:#f7f7fb;border-radius:12px;padding:11px}.metric small{display:block;color:var(--muted);font-size:11px}.metric b{display:block;font-size:18px;margin-top:4px}.splitBar{height:14px;border-radius:999px;background:#eee;overflow:hidden;display:flex;margin:10px 0}.splitTutor{background:#6c4cff}.splitSchool{background:#c4b5fd}.splitLegend{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}.chart{display:flex;align-items:flex-end;gap:5px;height:150px;padding-top:8px}.chartCol{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}.chartVal{font-size:8px;color:var(--muted);white-space:nowrap}.chartBar{width:70%;max-width:24px;background:var(--accent);border-radius:6px 6px 2px 2px;min-height:2px}.chartLab{font-size:9px;color:var(--muted)}.studentIncomeRow{display:flex;align-items:center;gap:9px;margin:10px 0}.studentIncomeName{width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.studentIncomeTrack{height:9px;background:#eee;border-radius:999px;flex:1;overflow:hidden}.studentIncomeFill{height:100%;background:var(--accent);border-radius:999px}.studentIncomeAmt{width:72px;text-align:right;font-size:12px;font-weight:800}.analyticsEmpty{color:var(--muted);font-size:13px;padding:5px 0}
+
 </style>
 </head>
 <body>
@@ -163,7 +166,7 @@ const GEN=['січня','лютого','березня','квітня','трав
 const HSTART=8,HEND=23,HOURPX=66;
 const KEY='miy_repetytor_v4_2_8';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.3.2';
+const APP_VERSION='4.3.3';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -615,38 +618,76 @@ function openClassEditor(cl=null){
 }
 
 function renderFinance(){
-  const now=new Date(), ym=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
-  const tutor=state.data.payments
-    .filter(p=>String(p.date||'').slice(0,7)===ym)
-    .reduce((a,p)=>a+Number(p.amount||0),0);
-  const inc=state.data.income.filter(x=>String(x.date||'').slice(0,7)===ym);
-  const salary=inc.filter(x=>x.type==='salary').reduce((a,x)=>a+Number(x.amount),0);
-  const advance=inc.filter(x=>x.type==='advance').reduce((a,x)=>a+Number(x.amount),0);
-  const other=inc.filter(x=>x.type==='other').reduce((a,x)=>a+Number(x.amount),0);
-  const total=tutor+salary+advance+other;
+  state.financeMode ||= 'month';
+  state.financeDate ||= iso(new Date()).slice(0,7);
+  const [fy,fm]=state.financeDate.split('-').map(Number);
+  const mode=state.financeMode;
+  const periodMatch=date=>{
+    const d=String(date||'');
+    return mode==='month' ? d.slice(0,7)===state.financeDate : d.slice(0,4)===String(fy);
+  };
+  const periodPayments=state.data.payments.filter(p=>periodMatch(p.date));
+  const tutor=periodPayments.reduce((a,p)=>a+Number(p.amount||0),0);
+  const inc=state.data.income.filter(x=>periodMatch(x.date));
+  const salary=inc.filter(x=>x.type==='salary').reduce((a,x)=>a+Number(x.amount||0),0);
+  const advance=inc.filter(x=>x.type==='advance').reduce((a,x)=>a+Number(x.amount||0),0);
+  const other=inc.filter(x=>x.type==='other').reduce((a,x)=>a+Number(x.amount||0),0);
+  const schoolIncome=salary+advance+other, total=tutor+schoolIncome;
   const prepaid=state.data.students.reduce((a,s)=>a+stats(s.id).prepaid,0);
   const expected=state.data.students.reduce((a,s)=>a+stats(s.id).debt,0);
+  const conducted=state.data.lessons.filter(l=>l.status==='conducted' && periodMatch(l.date));
+  const conductedValue=conducted.reduce((a,l)=>a+Number(l.price||0),0);
+  const avgLesson=conducted.length?conductedValue/conducted.length:0;
+  const schoolCount=state.data.schoolLessons.filter(l=>periodMatch(l.date) && !isVacationDate(l.date,l.classId)).length;
+  const byStudent=state.data.students.map(st=>({name:st.name,amount:periodPayments.filter(p=>p.studentId===st.id).reduce((a,p)=>a+Number(p.amount||0),0)})).filter(x=>x.amount>0).sort((a,b)=>b.amount-a.amount);
+  const maxStudent=Math.max(1,...byStudent.map(x=>x.amount));
+  const monthly=Array.from({length:12},(_,i)=>{
+    const ym=`${fy}-${pad(i+1)}`;
+    const tp=state.data.payments.filter(p=>String(p.date||'').slice(0,7)===ym).reduce((a,p)=>a+Number(p.amount||0),0);
+    const si=state.data.income.filter(x=>String(x.date||'').slice(0,7)===ym).reduce((a,x)=>a+Number(x.amount||0),0);
+    return {v:tp+si,label:MONTHS[i].slice(0,3)};
+  });
+  const maxMonth=Math.max(1,...monthly.map(x=>x.v));
+  const tutorPct=total>0?tutor/total*100:0;
   const history=[
-    ...state.data.payments.map(p=>({date:p.date,amount:Number(p.amount||0),label:`Репетиторство · ${student(p.studentId)?.name||'Учень'}${p.source==='lesson'?' · заняття':''}`})),
-    ...state.data.income.map(x=>({date:x.date,amount:x.amount,label:x.type==='salary'?'Зарплата':x.type==='advance'?'Аванс':x.note||'Інший дохід'}))
-  ].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+    ...state.data.payments.filter(p=>periodMatch(p.date)).map(p=>({date:p.date,amount:Number(p.amount||0),label:`Репетиторство · ${student(p.studentId)?.name||'Учень'}${p.source==='lesson'?' · заняття':''}`})),
+    ...state.data.income.filter(x=>periodMatch(x.date)).map(x=>({date:x.date,amount:Number(x.amount||0),label:x.type==='salary'?'Зарплата':x.type==='advance'?'Аванс':x.note||'Інший дохід'}))
+  ].sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,30);
+  const periodTitle=mode==='month'?`${MONTHS[fm-1]} ${fy}`:`${fy} рік`;
   document.getElementById('topbar').innerHTML='';
   document.getElementById('main').innerHTML=`<div class="finance">
-    <div class="finHead"><div class="finMonth"><b>${MONTHS[now.getMonth()]} ${now.getFullYear()}</b><button class="moreBtn" id="appMenuBtn" aria-label="Меню">⋮</button></div><div class="finTotal">${money(total)}</div><div class="summary">Загальний отриманий дохід</div></div>
+    <div class="finHead"><div class="finMonth"><b>Фінанси</b><button class="moreBtn" id="appMenuBtn" aria-label="Меню">⋮</button></div>
+      <div class="finPeriodNav"><button id="finPrev">‹</button><div class="finPeriodLabel">${periodTitle}</div><button id="finNext">›</button></div>
+      <div class="finTotal">${money(total)}</div><div class="summary">Отриманий дохід за ${mode==='month'?'період':'рік'}</div></div>
+    <div class="finToggle"><button data-finmode="month" class="${mode==='month'?'active':''}">Місяць</button><button data-finmode="year" class="${mode==='year'?'active':''}">Рік</button></div>
     <div class="finGrid">
-      <div class="finCard"><small>Репетиторство</small><b>${money(tutor)}</b></div>
-      <div class="finCard"><small>Зарплата</small><b>${money(salary)}</b></div>
-      <div class="finCard"><small>Аванс</small><b>${money(advance)}</b></div>
-      <div class="finCard"><small>Інше</small><b>${money(other)}</b></div>
-      <div class="finCard"><small>Передоплати учнів</small><b>${money(prepaid)}</b></div>
-      <div class="finCard"><small>Очікується</small><b>${money(expected)}</b></div>
+      <div class="finCard"><small>Репетиторство</small><b>${money(tutor)}</b></div><div class="finCard"><small>Школа</small><b>${money(schoolIncome)}</b></div>
+      <div class="finCard"><small>Зарплата</small><b>${money(salary)}</b></div><div class="finCard"><small>Аванс</small><b>${money(advance)}</b></div>
+      <div class="finCard"><small>Інше</small><b>${money(other)}</b></div><div class="finCard"><small>Передоплати учнів</small><b>${money(prepaid)}</b></div>
+      <div class="finCard"><small>Борги учнів</small><b>${money(expected)}</b></div><div class="finCard"><small>Проведено занять</small><b>${conducted.length}</b></div>
+    </div>
+    <div class="analytics">
+      <div class="analyticsBox"><div class="analyticsTitle">Аналітика</div><div class="metricGrid">
+        <div class="metric"><small>Середня вартість проведеного заняття</small><b>${money(avgLesson)}</b></div>
+        <div class="metric"><small>Шкільних уроків у розкладі</small><b>${schoolCount}</b></div>
+      </div></div>
+      <div class="analyticsBox"><div class="analyticsTitle">Школа / репетиторство</div>
+        <div class="splitBar"><div class="splitTutor" style="width:${tutorPct}%"></div><div class="splitSchool" style="width:${100-tutorPct}%"></div></div>
+        <div class="splitLegend"><span>Репетиторство ${money(tutor)}</span><span>Школа ${money(schoolIncome)}</span></div>
+      </div>
+      <div class="analyticsBox"><div class="analyticsTitle">Дохід по учнях</div>${byStudent.length?byStudent.map(x=>`<div class="studentIncomeRow"><div class="studentIncomeName">${esc(x.name)}</div><div class="studentIncomeTrack"><div class="studentIncomeFill" style="width:${x.amount/maxStudent*100}%"></div></div><div class="studentIncomeAmt">${money(x.amount)}</div></div>`).join(''):'<div class="analyticsEmpty">За цей період оплат від учнів немає</div>'}</div>
+      <div class="analyticsBox"><div class="analyticsTitle">Динаміка доходу · ${fy}</div><div class="chart">${monthly.map(x=>`<div class="chartCol"><div class="chartVal">${x.v?Math.round(x.v/1000*10)/10+'к':''}</div><div class="chartBar" style="height:${Math.max(2,x.v/maxMonth*105)}px"></div><div class="chartLab">${x.label}</div></div>`).join('')}</div></div>
     </div>
     <div class="finActions"><button class="primary" id="addIncome">+ Додати дохід</button></div>
-    <div class="finHistory"><div class="finTitle">Останні надходження</div>${history.length?history.map(x=>`<div class="history"><div><div class="h1">${esc(x.label)}</div><div class="h2">${fmt(x.date)}</div></div><b style="color:var(--good)">+${money(x.amount)}</b></div>`).join(''):'<div class="empty">Надходжень ще немає</div>'}</div>
+    <div class="finHistory"><div class="finTitle">Надходження за період</div>${history.length?history.map(x=>`<div class="history"><div><div class="h1">${esc(x.label)}</div><div class="h2">${fmt(x.date)}</div></div><b style="color:var(--good)">+${money(x.amount)}</b></div>`).join(''):'<div class="empty">Надходжень за цей період немає</div>'}</div>
   </div>`;
   document.getElementById('addIncome').onclick=openIncome;
   document.getElementById('appMenuBtn').onclick=()=>openAppMenu();
+  document.querySelectorAll('[data-finmode]').forEach(b=>b.onclick=()=>{state.financeMode=b.dataset.finmode;renderFinance()});
+  const shift=dir=>{let y=fy,m=fm;if(mode==='month'){m+=dir;if(m<1){m=12;y--}if(m>12){m=1;y++}}else y+=dir;state.financeDate=`${y}-${pad(m)}`;renderFinance()};
+  document.getElementById('finPrev').onclick=()=>shift(-1);document.getElementById('finNext').onclick=()=>shift(1);
 }
+
 function openIncome(){
   const m=document.getElementById('cardModal');
   m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">Додати дохід</div></div><div class="mbody">
