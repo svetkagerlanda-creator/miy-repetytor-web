@@ -43,7 +43,7 @@ button{cursor:pointer}
 .hourline{height:var(--hour);border-bottom:1px solid var(--line)}
 .lesson{position:absolute;left:2px;right:2px;border:0;border-radius:5px;padding:4px 3px;text-align:left;color:#fff;overflow:hidden;box-shadow:0 1px 2px #0002}
 .lesson .name{font-size:10px;font-weight:850;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lesson .meta{font-size:8.5px;font-weight:750;margin-top:3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:clip}.lesson.school{color:#fff}.lesson .mode{font-size:8px;margin-top:2px;opacity:.95}
+.lesson .meta{font-size:8.5px;font-weight:750;margin-top:3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:clip}.lesson.school{color:#fff;padding:3px}.lesson.school .schoolClass{font-size:10px;font-weight:900;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lesson.school .schoolSubject{font-size:8.8px;font-weight:800;line-height:1.05;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lesson .mode{font-size:7.5px;margin-top:2px;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lesson .paidmark{font-size:10px;font-weight:900;float:right;margin-left:2px}
 .students{height:100%;overflow:auto;background:var(--bg)}
 .studentTop{padding:16px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
@@ -93,7 +93,7 @@ textarea{min-height:80px;resize:vertical}
 .subjectEditor + .subjectEditor{margin-top:10px}
 .subjectHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .subjectHead b{font-size:14px}.miniDelete{border:0;background:#fee2e2;color:#b91c1c;border-radius:9px;padding:7px 9px;font-weight:800}
-.colorInput{padding:3px;height:46px}
+.colorInput{padding:3px;height:46px}.colorSelectWrap{display:flex;align-items:center;gap:8px}.colorPreview{width:22px;height:22px;border-radius:50%;flex:0 0 22px;border:1px solid #0002}.colorSelectWrap select{flex:1}
 .choiceBox{display:flex;flex-direction:column;gap:10px}
 .choiceBtn{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:14px;text-align:left;font-weight:800}
 .choiceBtn small{display:block;color:var(--muted);font-weight:500;margin-top:4px}
@@ -133,9 +133,19 @@ const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const MONTHS=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const GEN=['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
 const HSTART=8,HEND=23,HOURPX=66;
-const KEY='miy_repetytor_v4_2_3';
+const KEY='miy_repetytor_v4_2_4';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.2.3';
+const APP_VERSION='4.2.4';
+const COLOR_OPTIONS=[
+  ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
+  ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
+  ['#0ea5e9','Блакитний'],['#0284c7','Темно-блакитний'],['#06b6d4','Бірюзово-блакитний'],['#0891b2','Морська хвиля'],['#14b8a6','Бірюзовий'],['#0f766e','Темна бірюза'],['#10b981','Смарагдовий'],['#059669','Темний смарагдовий'],
+  ['#22c55e','Зелений'],['#16a34a','Темно-зелений'],['#84cc16','Лаймовий'],['#65a30d','Оливково-зелений'],['#eab308','Жовтий'],['#ca8a04','Гірчичний'],['#f59e0b','Бурштиновий'],['#d97706','Темний бурштин'],
+  ['#f97316','Помаранчевий'],['#ea580c','Темно-помаранчевий'],['#fb923c','Персиковий'],['#c2410c','Теракотовий'],['#a16207','Коричнево-золотий'],['#92400e','Карамельний'],['#78350f','Коричневий'],['#7f1d1d','Бордовий'],
+  ['#64748b','Сіро-синій'],['#475569','Графітовий'],['#334155','Темний графіт'],['#1e293b','Сланцевий'],['#111827','Майже чорний'],['#6b7280','Сірий'],['#9ca3af','Світло-сірий'],['#78716c','Теплий сірий']
+];
+const colorOptionsHtml=(selected)=>COLOR_OPTIONS.map(([hex,name])=>`<option value="${hex}" ${hex.toLowerCase()===(selected||'').toLowerCase()?'selected':''}>● ${name}</option>`).join('');
+const contrastText=hex=>{const h=(hex||'#64748b').replace('#',''); if(h.length!==6)return '#fff'; const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16); return (r*299+g*587+b*114)/1000>165?'#17171b':'#fff';};
 const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -152,7 +162,8 @@ function load(){
     let x=JSON.parse(localStorage.getItem(KEY)||'null');
     if(x)return x;
     // Якщо користувач уже щось вніс у попередню чисту версію — забираємо дані звідти.
-    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_2')||'null')
+    let old=JSON.parse(localStorage.getItem('miy_repetytor_v4_2_3')||'null')
+      || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_2')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2_1')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4_2')||'null')
       || JSON.parse(localStorage.getItem('miy_repetytor_v4')||'null')
@@ -317,8 +328,9 @@ function renderCalendar(){
       if(!cl||!sub)return '';
       const top=(mins(l.start)-HSTART*60)/60;
       const dur=Math.max(.35,(mins(l.end)-mins(l.start))/60);
-      return `<button class="lesson school" data-kind="school" data-id="${l.id}" style="top:calc(var(--hour) * ${top});height:calc(var(--hour) * ${dur} - 2px);background:${sub.color||'#64748b'}">
-        <div class="name">${esc(cl.name)} · ${esc(sub.name)}</div><div class="mode">${l.mode==='remote'?'💻 Дистанційно':'🏫 Очно'}</div>
+      const bg=sub.color||'#64748b',fg=contrastText(bg);
+      return `<button class="lesson school" data-kind="school" data-id="${l.id}" style="top:calc(var(--hour) * ${top});height:calc(var(--hour) * ${dur} - 2px);background:${bg};color:${fg}">
+        <div class="schoolClass">${esc(cl.name)}</div><div class="schoolSubject">${esc(sub.name)}</div><div class="mode">${l.mode==='remote'?'💻 Дист.':'🏫 Очно'}</div>
       </button>`
     }).join('');
     cols+=`<div class="daycol" data-date="${d}">${lines}${tutor}${school}</div>`
@@ -375,7 +387,7 @@ function renderClasses(){
   document.getElementById('topbar').innerHTML='';
   const rows=state.data.schoolClasses.map(cl=>`<button class="classRow" data-id="${cl.id}">
     <span class="classBadge">${esc(cl.name)}</span>
-    <span class="smain"><span class="sname">${esc(cl.name)}</span><span class="subjectChips">${(cl.subjects||[]).map(s=>`<span class="subjectChip" style="background:${s.color}">${esc(s.name)}</span>`).join('')||'<span class="ssub">Предметів ще немає</span>'}</span></span>
+    <span class="smain"><span class="sname">${esc(cl.name)}</span><span class="subjectChips">${(cl.subjects||[]).map(s=>`<span class="subjectChip" style="background:${s.color};color:${contrastText(s.color)}">${esc(s.name)}</span>`).join('')||'<span class="ssub">Предметів ще немає</span>'}</span></span>
   </button>`).join('');
   document.getElementById('main').innerHTML=`<div class="classes">
     <div class="studentTop"><div><h1>Класи</h1><div class="summary">Шкільні класи та предмети</div></div><button class="fab" id="addClass">+</button></div>
@@ -400,11 +412,11 @@ function openClassEditor(cl=null){
     document.getElementById('subjectsBox').innerHTML=subjects.map((s,i)=>`<div class="subjectEditor" data-i="${i}">
       <div class="subjectHead"><b>Предмет ${i+1}</b>${subjects.length>1?`<button class="miniDelete" data-del="${i}">Видалити</button>`:''}</div>
       <div><label>Назва</label><input class="subName" data-i="${i}" value="${esc(s.name)}" placeholder="Алгебра"></div>
-      <div class="row2" style="margin-top:10px"><div><label>Колір</label><input class="subColor colorInput" data-i="${i}" type="color" value="${s.color||'#8b5cf6'}"></div>
+      <div class="row2" style="margin-top:10px"><div><label>Колір</label><div class="colorSelectWrap"><span class="colorPreview" data-preview="${i}" style="background:${s.color||'#8b5cf6'}"></span><select class="subColor" data-i="${i}">${colorOptionsHtml(s.color||'#8b5cf6')}</select></div></div>
       <div><label>За замовчуванням</label><select class="subMode" data-i="${i}"><option value="inperson" ${s.mode!=='remote'?'selected':''}>Очно</option><option value="remote" ${s.mode==='remote'?'selected':''}>Дистанційно</option></select></div></div>
     </div>`).join('');
     document.querySelectorAll('.subName').forEach(x=>x.oninput=e=>subjects[+e.target.dataset.i].name=e.target.value);
-    document.querySelectorAll('.subColor').forEach(x=>x.oninput=e=>subjects[+e.target.dataset.i].color=e.target.value);
+    document.querySelectorAll('.subColor').forEach(x=>x.onchange=e=>{const i=+e.target.dataset.i;subjects[i].color=e.target.value;const p=document.querySelector(`[data-preview="${i}"]`);if(p)p.style.background=e.target.value});
     document.querySelectorAll('.subMode').forEach(x=>x.onchange=e=>subjects[+e.target.dataset.i].mode=e.target.value);
     document.querySelectorAll('[data-del]').forEach(x=>x.onclick=()=>{subjects.splice(+x.dataset.del,1);drawSubjects()});
   };
