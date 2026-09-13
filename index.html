@@ -121,6 +121,7 @@ textarea{min-height:80px;resize:vertical}
 .statusTag{display:inline-block;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:850;margin-top:7px;background:#f1f1f5;color:#666}
 .statusTag.conducted{background:#dcfce7;color:#15803d}.statusTag.cancelled{background:#fee2e2;color:#b91c1c}.statusTag.no_show{background:#fff7d6;color:#a16207}.statusTag.planned{background:#eeeafc;color:#6c4cff}
 .lesson.cancelled{opacity:.45;text-decoration:line-through}.lesson.no_show{outline:2px solid #f59e0b;outline-offset:-2px}
+.moreBtn{border:0;background:#f3f1ff;color:var(--accent);width:38px;height:38px;border-radius:50%;font-size:24px;line-height:34px;font-weight:800;padding:0}.headerActions{display:flex;align-items:center;gap:8px}.menuList{display:flex;flex-direction:column;gap:8px}.menuItem{width:100%;border:1px solid var(--line);background:#fff;border-radius:13px;padding:14px;text-align:left;font-weight:800}.menuItem small{display:block;color:var(--muted);font-weight:500;margin-top:4px}.menuItem.danger{color:var(--bad)}.aboutBox{background:#f7f7fb;border-radius:14px;padding:14px;font-size:13px;line-height:1.5;color:#555}.aboutBox b{color:var(--text)}
 
 </style>
 </head>
@@ -146,6 +147,7 @@ textarea{min-height:80px;resize:vertical}
 <div id="studentModal" class="modal"></div>
 <div id="cardModal" class="modal"></div>
 <div id="choiceModal" class="modal"></div>
+<input id="backupInput" type="file" accept="application/json,.json" hidden>
 
 <script>
 const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
@@ -154,7 +156,7 @@ const GEN=['січня','лютого','березня','квітня','трав
 const HSTART=8,HEND=23,HOURPX=66;
 const KEY='miy_repetytor_v4_2_8';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.2.8';
+const APP_VERSION='4.3.0';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -328,12 +330,13 @@ function renderCalendar(){
     <div><button id="todayBtn" style="border:0;background:transparent;padding:0;text-align:left"><div class="month">${MONTHS[week.getMonth()]}</div></button>
       <div class="weeknav"><button class="iconbtn" id="prevW">‹</button><span>${week.getDate()} – ${end.getDate()} ${GEN[end.getMonth()]}</span><button class="iconbtn" id="nextW">›</button></div>
     </div>
-    <div class="todayActions"><button class="todayPill" id="openToday">Сьогодні</button><button class="fab" id="addEvent">+</button></div>`;
+    <div class="todayActions"><button class="todayPill" id="openToday">Сьогодні</button><button class="fab" id="addEvent">+</button><button class="moreBtn" id="appMenuBtn" aria-label="Меню">⋮</button></div>`;
   document.getElementById('todayBtn').onclick=()=>{state.week=startWeek(new Date());render()};
   document.getElementById('prevW').onclick=()=>{state.week=addDays(state.week,-7);render()};
   document.getElementById('nextW').onclick=()=>{state.week=addDays(state.week,7);render()};
   document.getElementById('addEvent').onclick=()=>openEventChoice();
   document.getElementById('openToday').onclick=()=>openToday();
+  document.getElementById('appMenuBtn').onclick=()=>openAppMenu();
 
   let heads='<div class="timeHead"></div>';
   for(let i=0;i<7;i++){let d=addDays(week,i);heads+=`<div class="dayhead"><div class="n">${d.getDate()}</div><div class="d">${DAYS[i]}</div></div>`}
@@ -498,10 +501,11 @@ function renderStudents(){
     </button>`
   }).join('');
   document.getElementById('main').innerHTML=`<div class="students">
-    <div class="studentTop"><div><h1>Учні</h1><div class="summary">${state.data.students.length} ${state.data.students.length===1?'учень':'учнів'}</div></div><button class="fab" id="addStudent">+</button></div>
+    <div class="studentTop"><div><h1>Учні</h1><div class="summary">${state.data.students.length} ${state.data.students.length===1?'учень':'учнів'}</div></div><div class="headerActions"><button class="fab" id="addStudent">+</button><button class="moreBtn" id="appMenuBtn" aria-label="Меню">⋮</button></div></div>
     ${rows || '<div class="emptyState"><b>Учнів ще немає</b><span>Натисни «+», щоб додати першого учня.</span></div>'}
   </div>`;
   document.getElementById('addStudent').onclick=()=>openStudent();
+  document.getElementById('appMenuBtn').onclick=()=>openAppMenu();
   document.querySelectorAll('.studentRow').forEach(b=>b.onclick=()=>openCard(b.dataset.id));
 }
 function renderClasses(){
@@ -511,10 +515,11 @@ function renderClasses(){
     <span class="smain"><span class="sname">${esc(cl.name)}</span><span class="subjectChips">${(cl.subjects||[]).map(s=>`<span class="subjectChip" style="background:${s.color};color:${contrastText(s.color)}">${esc(s.name)}</span>`).join('')||'<span class="ssub">Предметів ще немає</span>'}</span></span>
   </button>`).join('');
   document.getElementById('main').innerHTML=`<div class="classes">
-    <div class="studentTop"><div><h1>Класи</h1><div class="summary">Шкільні класи та предмети</div></div><button class="fab" id="addClass">+</button></div>
+    <div class="studentTop"><div><h1>Класи</h1><div class="summary">Шкільні класи та предмети</div></div><div class="headerActions"><button class="fab" id="addClass">+</button><button class="moreBtn" id="appMenuBtn" aria-label="Меню">⋮</button></div></div>
     ${rows||'<div class="emptyState"><b>Класів ще немає</b><span>Додай клас, а в ньому — предмети, кольори та формат уроків.</span></div>'}
   </div>`;
   document.getElementById('addClass').onclick=()=>openClassEditor();
+  document.getElementById('appMenuBtn').onclick=()=>openAppMenu();
   document.querySelectorAll('.classRow').forEach(b=>b.onclick=()=>openClassEditor(state.data.schoolClasses.find(c=>c.id===b.dataset.id)));
 }
 function openClassEditor(cl=null){
@@ -580,7 +585,7 @@ function renderFinance(){
   ].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
   document.getElementById('topbar').innerHTML='';
   document.getElementById('main').innerHTML=`<div class="finance">
-    <div class="finHead"><div class="finMonth"><b>${MONTHS[now.getMonth()]} ${now.getFullYear()}</b></div><div class="finTotal">${money(total)}</div><div class="summary">Загальний отриманий дохід</div></div>
+    <div class="finHead"><div class="finMonth"><b>${MONTHS[now.getMonth()]} ${now.getFullYear()}</b><button class="moreBtn" id="appMenuBtn" aria-label="Меню">⋮</button></div><div class="finTotal">${money(total)}</div><div class="summary">Загальний отриманий дохід</div></div>
     <div class="finGrid">
       <div class="finCard"><small>Репетиторство</small><b>${money(tutor)}</b></div>
       <div class="finCard"><small>Зарплата</small><b>${money(salary)}</b></div>
@@ -593,6 +598,7 @@ function renderFinance(){
     <div class="finHistory"><div class="finTitle">Останні надходження</div>${history.length?history.map(x=>`<div class="history"><div><div class="h1">${esc(x.label)}</div><div class="h2">${fmt(x.date)}</div></div><b style="color:var(--good)">+${money(x.amount)}</b></div>`).join(''):'<div class="empty">Надходжень ще немає</div>'}</div>
   </div>`;
   document.getElementById('addIncome').onclick=openIncome;
+  document.getElementById('appMenuBtn').onclick=()=>openAppMenu();
 }
 function openIncome(){
   const m=document.getElementById('cardModal');
@@ -609,6 +615,92 @@ function openIncome(){
     save();m.classList.remove('open');history.replaceState({tab:state.tab},'');renderFinance();
   };
 }
+
+
+function openAppMenu(){
+  const m=document.getElementById('choiceModal');
+  m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">Меню</div></div>
+  <div class="mbody">
+    <div class="menuList">
+      <button class="menuItem" id="shareApp">↗ Поділитися застосунком<small>Надіслати посилання колезі</small></button>
+      <button class="menuItem" id="exportBackup">💾 Експорт резервної копії<small>Зберегти всі дані одним JSON-файлом</small></button>
+      <button class="menuItem" id="importBackup">📥 Імпорт резервної копії<small>Відновити дані із збереженого файлу</small></button>
+      <button class="menuItem" id="aboutApp">ⓘ Про застосунок<small>Версія ${APP_VERSION}</small></button>
+    </div>
+  </div>`;
+  openModal(m,'appMenu');
+  m.querySelector('.close').onclick=()=>closeModal(m);
+  document.getElementById('shareApp').onclick=shareApp;
+  document.getElementById('exportBackup').onclick=exportBackup;
+  document.getElementById('importBackup').onclick=()=>document.getElementById('backupInput').click();
+  document.getElementById('aboutApp').onclick=()=>{
+    m.querySelector('.mbody').innerHTML=`<div class="aboutBox"><b>Мій репетитор</b><br>Версія ${APP_VERSION}<br><br>Календар для школи й репетиторства, учні, класи, оплати та фінанси. Дані зберігаються локально на цьому пристрої, тому резервні копії краще робити регулярно.</div><button class="secondary" id="backToMenu">← Назад</button>`;
+    document.getElementById('backToMenu').onclick=()=>{m.classList.remove('open');history.replaceState({tab:state.tab},'');openAppMenu()};
+  };
+}
+
+async function shareApp(){
+  const url=location.origin+location.pathname;
+  try{
+    if(navigator.share){
+      await navigator.share({title:'Мій репетитор',text:'Застосунок для розкладу школи та репетиторства',url});
+    }else if(navigator.clipboard){
+      await navigator.clipboard.writeText(url);
+      alert('Посилання скопійовано.');
+    }else{
+      prompt('Скопіюй посилання:',url);
+    }
+  }catch(e){
+    if(e && e.name!=='AbortError') alert('Не вдалося поділитися. Спробуй ще раз.');
+  }
+}
+
+function exportBackup(){
+  save();
+  const backup={
+    app:'Мій репетитор',
+    version:APP_VERSION,
+    exportedAt:new Date().toISOString(),
+    data:state.data
+  };
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  const stamp=iso(new Date());
+  a.href=URL.createObjectURL(blob);
+  a.download=`miy-repetytor-backup-${stamp}.json`;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+function validBackupData(d){
+  return d && typeof d==='object' && Array.isArray(d.students) && Array.isArray(d.lessons) && Array.isArray(d.payments) && Array.isArray(d.income) && Array.isArray(d.schoolLessons);
+}
+
+async function importBackupFile(file){
+  if(!file)return;
+  try{
+    const raw=await file.text();
+    const parsed=JSON.parse(raw);
+    const data=parsed?.data||parsed;
+    if(!validBackupData(data))throw new Error('bad backup');
+    const counts=`Учні: ${data.students.length}\nРепетиторські заняття: ${data.lessons.length}\nШкільні уроки: ${data.schoolLessons.length}`;
+    if(!confirm(`Відновити цю резервну копію?\n\n${counts}\n\nПоточні дані в застосунку буде замінено даними з копії.`))return;
+    state.data=JSON.parse(JSON.stringify(data));
+    normalizeData();
+    save();
+    reconcileDirectLessonPayments();
+    closeAllModals();
+    history.replaceState({tab:state.tab},'');
+    render();
+    alert('Резервну копію відновлено.');
+  }catch(e){
+    alert('Не вдалося прочитати резервну копію. Обери JSON-файл, створений у «Моєму репетиторі».');
+  }finally{
+    document.getElementById('backupInput').value='';
+  }
+}
+
+document.getElementById('backupInput').addEventListener('change',e=>importBackupFile(e.target.files?.[0]));
 
 
 function repeatUntilDefault(dateStr){
