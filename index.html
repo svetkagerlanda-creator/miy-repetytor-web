@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Мій репетитор</title>
+  <style>
+
+:root{
+  --bg:#f7f7f9; --surface:#fff; --text:#18181b; --muted:#8b8b95;
+  --line:#e7e7ec; --accent:#5b36f2; --danger:#ef4444; --ok:#16a34a;
+  --navh:74px; --hourh:72px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+body{min-height:100vh;overflow-x:hidden}
+button,input,select{font:inherit}
+button{cursor:pointer}
+#app{max-width:900px;margin:0 auto;min-height:100vh;background:#fff;box-shadow:0 0 30px rgba(0,0,0,.06)}
+.topbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:flex-start;padding:14px 14px 8px;background:#fff;border-bottom:1px solid var(--line)}
+.month-line{display:flex;gap:8px;align-items:center}
+.ghost-title{border:0;background:transparent;padding:0;font-size:22px;font-weight:800}
+.week-line{display:flex;align-items:center;margin-top:4px}
+.week-range{font-size:15px;min-width:140px;text-align:center}
+.icon-btn{border:0;background:transparent;font-size:28px;line-height:1;padding:0 6px;color:#3f3f46}
+.header-actions{display:flex;align-items:center;gap:12px}
+.money-summary{font-size:14px;margin-top:4px;white-space:nowrap}
+.round-plus{width:42px;height:42px;border:0;border-radius:50%;background:var(--accent);color:white;font-size:26px;line-height:42px;box-shadow:0 8px 18px rgba(91,54,242,.22)}
+.tiny{font-size:12px}.muted{color:var(--muted)}
+main{padding-bottom:var(--navh)}
+.view{display:none}.view.active{display:block}
+
+.calendar-shell{position:relative;overflow:auto;height:calc(100vh - 132px);background:#fff}
+.calendar-header{display:grid;grid-template-columns:48px repeat(7,minmax(62px,1fr));position:sticky;top:0;z-index:12;background:#fff;border-bottom:1px solid var(--line)}
+.day-head{padding:10px 2px;text-align:center;font-size:12px;border-left:1px solid var(--line)}
+.day-head.today{font-weight:800;color:var(--accent)}
+.day-num{font-size:15px;font-weight:700}.day-name{color:var(--muted);margin-top:2px}
+.calendar-body{position:relative;display:grid;grid-template-columns:48px repeat(7,minmax(62px,1fr));min-width:520px}
+.time-col{grid-column:1;position:relative}
+.time-label{height:var(--hourh);border-bottom:1px solid var(--line);font-size:12px;color:#666;padding:4px 6px;text-align:right}
+.day-col{position:relative;border-left:1px solid var(--line)}
+.hour-cell{height:var(--hourh);border-bottom:1px solid var(--line)}
+.lesson-block{position:absolute;left:3px;right:3px;border-radius:4px;padding:5px 5px 4px;color:#fff;font-size:12px;font-weight:800;overflow:hidden;box-shadow:0 2px 5px rgba(0,0,0,.12);z-index:5}
+.lesson-block .lesson-meta{font-size:10px;font-weight:600;opacity:.92;margin-top:2px;white-space:nowrap}
+.lesson-block.unpaid::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:50%}
+.lesson-block.paid::after{content:"✓";position:absolute;top:2px;right:4px;font-size:10px;background:rgba(255,255,255,.95);color:#15803d;width:14px;height:14px;border-radius:50%;display:grid;place-items:center}
+
+.students-head{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 16px;border-bottom:1px solid var(--line)}
+.students-head h1{margin:0 0 8px;font-size:24px}
+.student-totals{display:flex;gap:18px;font-size:13px;color:var(--muted)}
+.student-totals b{color:var(--text)}
+.students-list{background:#fff}
+.student-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+.student-main{flex:1;min-width:0}
+.student-name{font-weight:700}.student-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.student-money{text-align:right}
+.student-money .balance{font-weight:800}.positive{color:var(--ok)}.negative{color:var(--danger)}.zero{color:#555}
+.student-money .unpaid{font-size:11px;color:var(--muted);margin-top:3px}
+
+.bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;z-index:30;width:min(900px,100%);height:var(--navh);display:grid;grid-template-columns:1fr 1fr;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{border:0;background:#fff;color:#73737c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px}
+.nav-btn.active{color:var(--accent);font-weight:700}
+.nav-icon{font-size:20px}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60}
+.sheet{position:fixed;z-index:70;left:50%;transform:translateX(-50%);bottom:0;width:min(620px,100%);max-height:94vh;overflow:auto;background:#fff;border-radius:18px 18px 0 0;box-shadow:0 -12px 35px rgba(0,0,0,.15)}
+.hidden{display:none!important}
+.sheet-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:2}
+.sheet-head h2{margin:0;flex:1;font-size:19px}
+.danger-icon{border:0;background:#fee2e2;color:#b91c1c;border-radius:10px;padding:8px}
+.text-btn{border:0;background:transparent;color:var(--accent);font-weight:700}
+.form{padding:16px;display:grid;gap:14px}
+.form label,.payment-panel label{display:grid;gap:7px;font-size:13px;font-weight:600}
+.form input,.form select,.payment-panel input{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fafafa;outline:none}
+.form input:focus,.form select:focus,.payment-panel input:focus{border-color:#a99bf8;background:#fff}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.section-label{font-weight:800;margin-top:3px}
+.input-money{position:relative}.input-money input{padding-right:36px}.input-money span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#666}
+.check-row{display:flex!important;align-items:center;gap:8px!important}.check-row input{width:auto}
+.primary{border:0;border-radius:12px;background:var(--accent);color:#fff;font-weight:800;padding:13px}
+.status-block{border:1px solid var(--line);border-radius:12px;padding:12px}
+.status-row{display:flex;align-items:center;justify-content:space-between}
+.status-pill{border:0;border-radius:999px;padding:7px 11px;font-weight:700}.status-pill.paid{background:#dcfce7;color:#15803d}.status-pill.unpaid{background:#fee2e2;color:#b91c1c}
+
+.student-card-content{padding:16px}
+.big-balance{font-size:34px;font-weight:900;margin-bottom:14px}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.mini-grid>div{background:#f7f7fb;padding:12px;border-radius:12px;display:grid;gap:4px}
+.mini-grid span{font-size:12px;color:var(--muted)}.mini-grid b{font-size:18px}
+.student-card-content h3{font-size:15px;margin:22px 0 8px}
+.payment-panel{margin-top:12px;padding:12px;background:#f8f8fb;border-radius:12px;display:grid;gap:10px}
+.history-item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.history-title{font-weight:700;font-size:13px}.history-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.history-amount{font-weight:800;white-space:nowrap}
+
+.empty{padding:40px 20px;text-align:center;color:var(--muted)}
+
+@media(max-width:560px){
+  :root{--hourh:64px}
+  .topbar{padding-left:10px;padding-right:10px}
+  .money-summary{font-size:12px}
+  .calendar-header{grid-template-columns:42px repeat(7,minmax(52px,1fr))}
+  .calendar-body{grid-template-columns:42px repeat(7,minmax(52px,1fr));min-width:420px}
+  .lesson-block{font-size:11px;padding:4px 3px}
+  .row3{grid-template-columns:1fr 1fr}.row3 label:last-child{grid-column:1/-1}
+}
+
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div>
+        <div class="month-line">
+          <button id="monthBtn" class="ghost-title">Вересень</button>
+          <span id="monthSummary" class="muted tiny"></span>
+        </div>
+        <div class="week-line">
+          <button id="prevWeek" class="icon-btn" aria-label="Попередній тиждень">‹</button>
+          <div id="weekRange" class="week-range"></div>
+          <button id="nextWeek" class="icon-btn" aria-label="Наступний тиждень">›</button>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="money-summary">
+          <div><b id="weekPaid">0 ₴</b> <span class="muted">з</span> <span id="weekTotal">0 ₴</span></div>
+        </div>
+        <button id="addLessonTop" class="round-plus" aria-label="Додати заняття">+</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="calendarView" class="view active">
+        <div class="calendar-shell">
+          <div class="calendar-header" id="calendarHeader"></div>
+          <div class="calendar-body" id="calendarBody"></div>
+        </div>
+      </section>
+
+      <section id="studentsView" class="view">
+        <div class="students-head">
+          <div>
+            <h1>Учні</h1>
+            <div class="student-totals">
+              <span>Не сплачено <b id="unpaidTotal">0 ₴</b></span>
+              <span>Баланс <b id="balanceTotal">0 ₴</b></span>
+            </div>
+          </div>
+          <button id="addStudentTop" class="round-plus" aria-label="Додати учня">+</button>
+        </div>
+        <div id="studentsList" class="students-list"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="calendar">
+        <span class="nav-icon">▣</span><span>Календар</span>
+      </button>
+      <button class="nav-btn" data-view="students">
+        <span class="nav-icon">●</span><span>Учні</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="modalBackdrop" class="modal-backdrop hidden"></div>
+
+  <div id="lessonModal" class="sheet hidden">
+    <div class="sheet-head">
+      <button class="icon-btn close-sheet">×</button>
+      <h2 id="lessonModalTitle">Додати заняття</h2>
+      <button id="deleteLesson" class="danger-icon hidden">🗑</button>
+    </div>
+    <form id="lessonForm" class="form">
+      <label>Учень
+        <select id="lessonStudent" required></select>
+      </label>
+      <label>Вартість заняття
+        <div class="input-money"><input id="lessonPrice" type="number" min="0" step="1" required><span>₴</span></div>
+      </label>
+      <div class="section-label">Час</div>
+      <label>Дата
+        <input id="lessonDate" type="date" required>
+      </label>
+      <div class="row3">
+        <label>Початок<input id="lessonStart" type="time" required></label>
+        <label>Кінець<input id="lessonEnd" type="time" required></label>
+        <label>Тривалість<input id="lessonDuration" type="text" readonly></label>
+      </div>
+      <label class="check-row"><input id="lessonRepeat" type="checkbox"> <span>Повторювати щотижня</span></label>
+      <label>Примітка
+        <input id="lessonNote" type="text" placeholder="Напр. Алгебра, тема 5">
+      </label>
+      <div id="lessonStatusBlock" class="status-block hidden">
+        <div class="status-row">
+          <span>Оплата</span>
+          <button type="button" id="togglePaid" class="status-pill unpaid">Не оплачено</button>
+        </div>
+      </div>
+      <button class="primary" type="submit">Зберегти</button>
+    </form>
+  </div>
+
+  <div id="studentModal" class="sheet hidden">
+    <div class="sheet-head">
+      <button class="icon-btn close-sheet">×</button>
+      <h2 id="studentModalTitle">Додати учня</h2>
+      <button id="deleteStudent" class="danger-icon hidden">🗑</button>
+    </div>
+    <form id="studentForm" class="form">
+      <label>Ім’я
+        <input id="studentName" type="text" required placeholder="Напр. Аліна">
+      </label>
+      <label>Клас / примітка
+        <input id="studentClass" type="text" placeholder="7 клас">
+      </label>
+      <label>Стандартна ціна
+        <div class="input-money"><input id="studentPrice" type="number" min="0" step="1" value="350" required><span>₴</span></div>
+      </label>
+      <label>Колір у календарі
+        <input id="studentColor" type="color" value="#8b5cf6">
+      </label>
+      <button class="primary" type="submit">Зберегти</button>
+    </form>
+  </div>
+
+  <div id="studentCardModal" class="sheet hidden">
+    <div class="sheet-head">
+      <button class="icon-btn close-sheet">×</button>
+      <h2 id="studentCardTitle">Учень</h2>
+      <button id="editStudentFromCard" class="text-btn">Редагувати</button>
+    </div>
+    <div class="student-card-content">
+      <div class="big-balance" id="studentCardBalance">0 ₴</div>
+      <div class="mini-grid">
+        <div><span>Не оплачено</span><b id="studentCardUnpaid">0 ₴</b></div>
+        <div><span>Усього отримано</span><b id="studentCardReceived">0 ₴</b></div>
+      </div>
+      <button id="openPaymentForm" class="primary">Внести оплату</button>
+
+      <div id="paymentPanel" class="payment-panel hidden">
+        <label>Сума
+          <div class="input-money"><input id="paymentAmount" type="number" min="1" step="1"><span>₴</span></div>
+        </label>
+        <label>Коментар
+          <input id="paymentNote" type="text" placeholder="Напр. Mono, за вересень">
+        </label>
+        <button id="savePayment" class="primary" type="button">Додати оплату</button>
+      </div>
+
+      <h3>Останні оплати</h3>
+      <div id="paymentHistory" class="history"></div>
+      <h3>Останні заняття</h3>
+      <div id="lessonHistory" class="history"></div>
+    </div>
+  </div>
+
+  <script>
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+const HOURS_START = 8;
+const HOURS_END = 22;
+const WEEKDAYS = ['нд','пн','вт','ср','чт','пт','сб'];
+const MONTHS = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+const MONTHS_GEN = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
+
+let state = JSON.parse(localStorage.getItem('tutorAppState') || 'null') || {
+  students: [
+    {id: crypto.randomUUID(), name:'Аліна', cls:'7 клас', price:350, color:'#d08ae8'},
+    {id: crypto.randomUUID(), name:'Анна', cls:'8 клас', price:350, color:'#d65f5f'},
+    {id: crypto.randomUUID(), name:'Світлана', cls:'7 клас', price:350, color:'#19b887'}
+  ],
+  lessons: [],
+  payments: []
+};
+let currentWeek = startOfWeek(new Date());
+let editingLessonId = null;
+let editingStudentId = null;
+let selectedStudentId = null;
+let lessonPaidDraft = false;
+
+function save(){ localStorage.setItem('tutorAppState', JSON.stringify(state)); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function isoDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function parseDate(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function startOfWeek(d){ let x=new Date(d); x.setHours(0,0,0,0); let day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); return x; }
+function addDays(d,n){ let x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function money(n){ return `${Math.round(n).toLocaleString('uk-UA')} ₴`; }
+function timeToMinutes(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+function durationText(start,end){ const min=timeToMinutes(end)-timeToMinutes(start); if(min<=0)return ''; const h=Math.floor(min/60), m=min%60; return h && m ? `${h} год ${m} хв` : h ? `${h} год` : `${m} хв`; }
+function studentById(id){ return state.students.find(s=>s.id===id); }
+function lessonById(id){ return state.lessons.find(l=>l.id===id); }
+
+function calcStudent(sid){
+  const received = state.payments.filter(p=>p.studentId===sid).reduce((a,p)=>a+Number(p.amount),0);
+  const lessons = state.lessons.filter(l=>l.studentId===sid);
+  const paidLessons = lessons.filter(l=>l.paid).reduce((a,l)=>a+Number(l.price),0);
+  const unpaid = lessons.filter(l=>!l.paid && parseDate(l.date) <= new Date()).reduce((a,l)=>a+Number(l.price),0);
+  return {received, paidLessons, balance:received-paidLessons, unpaid, lessons};
+}
+
+function seedDemo(){
+  if(state.lessons.length) return;
+  const s = state.students;
+  const w = startOfWeek(new Date());
+  const demo = [
+    [0,14,'14:00','15:00',0],[0,16,'16:00','17:00',2],
+    [1,16,'16:00','17:00',1],[1,18,'18:00','19:00',1],
+    [2,15,'15:00','16:00',0],[2,17,'17:00','18:00',0],
+    [3,16,'16:00','17:00',1],[4,15,'15:00','16:00',2]
+  ];
+  demo.forEach((d,i)=>{
+    state.lessons.push({
+      id:crypto.randomUUID(), studentId:s[d[4]%s.length].id, date:isoDate(addDays(w,d[0])),
+      start:d[2], end:d[3], price:s[d[4]%s.length].price, note:'', paid:i%3!==0
+    });
+  });
+  save();
+}
+
+function renderAll(){
+  renderHeader();
+  renderCalendar();
+  renderStudents();
+}
+function renderHeader(){
+  const end=addDays(currentWeek,6);
+  $('#weekRange').textContent = `${currentWeek.getDate()} – ${end.getDate()} ${MONTHS_GEN[end.getMonth()]}`;
+  $('#monthBtn').textContent = MONTHS[currentWeek.getMonth()];
+  const weekLessons = state.lessons.filter(l=>{
+    const d=parseDate(l.date); return d>=currentWeek && d<=addDays(currentWeek,6);
+  });
+  const total=weekLessons.reduce((a,l)=>a+Number(l.price),0);
+  const paid=weekLessons.filter(l=>l.paid).reduce((a,l)=>a+Number(l.price),0);
+  $('#weekPaid').textContent=money(paid);
+  $('#weekTotal').textContent=money(total);
+  $('#monthSummary').textContent='';
+}
+function renderCalendar(){
+  const header=$('#calendarHeader'); header.innerHTML='<div></div>';
+  for(let i=0;i<7;i++){
+    const d=addDays(currentWeek,i); const today=isoDate(d)===isoDate(new Date());
+    header.innerHTML += `<div class="day-head ${today?'today':''}"><div class="day-num">${d.getDate()}</div><div class="day-name">${WEEKDAYS[d.getDay()]}</div></div>`;
+  }
+  const body=$('#calendarBody'); body.innerHTML='';
+  const tc=document.createElement('div'); tc.className='time-col';
+  for(let h=HOURS_START;h<HOURS_END;h++) tc.innerHTML += `<div class="time-label">${h}</div>`;
+  body.appendChild(tc);
+
+  for(let i=0;i<7;i++){
+    const d=addDays(currentWeek,i), ds=isoDate(d);
+    const col=document.createElement('div'); col.className='day-col';
+    for(let h=HOURS_START;h<HOURS_END;h++) col.innerHTML += '<div class="hour-cell"></div>';
+    const lessons=state.lessons.filter(l=>l.date===ds);
+    lessons.forEach(l=>{
+      const s=studentById(l.studentId); if(!s)return;
+      const start=timeToMinutes(l.start)-HOURS_START*60, end=timeToMinutes(l.end)-HOURS_START*60;
+      const top=start/60*72, height=Math.max(30,(end-start)/60*72-2);
+      const el=document.createElement('button');
+      el.className=`lesson-block ${l.paid?'paid':'unpaid'}`;
+      el.style.top=`calc(${start/60} * var(--hourh) + 1px)`;
+      el.style.height=`calc(${Math.max((end-start)/60,0.45)} * var(--hourh) - 2px)`;
+      el.style.background=s.color;
+      el.innerHTML=`<div>${s.name}</div><div class="lesson-meta">${l.start} · ${l.price} ₴</div>`;
+      el.onclick=()=>openLesson(l.id);
+      col.appendChild(el);
+    });
+    body.appendChild(col);
+  }
+}
+
+function renderStudents(){
+  const list=$('#studentsList'); list.innerHTML='';
+  let unpaidTotal=0,balanceTotal=0;
+  state.students.forEach(s=>{
+    const c=calcStudent(s.id); unpaidTotal+=c.unpaid; balanceTotal+=c.balance;
+    const row=document.createElement('button'); row.className='student-row'; row.style.width='100%'; row.style.borderLeft='0'; row.style.borderRight='0'; row.style.background='#fff'; row.style.textAlign='left';
+    const bc=c.balance>0?'positive':c.balance<0?'negative':'zero';
+    row.innerHTML=`<span class="dot" style="background:${s.color}"></span>
+      <div class="student-main"><div class="student-name">${escapeHtml(s.name)}</div><div class="student-sub">${escapeHtml(s.cls||'')} · ${money(s.price)}</div></div>
+      <div class="student-money"><div class="balance ${bc}">${c.balance>0?'+':''}${money(c.balance)}</div><div class="unpaid">${c.unpaid?`Не оплачено ${money(c.unpaid)}`:'Боргів немає'}</div></div>`;
+    row.onclick=()=>openStudentCard(s.id); list.appendChild(row);
+  });
+  if(!state.students.length) list.innerHTML='<div class="empty">Ще немає учнів. Натисни +, щоб додати.</div>';
+  $('#unpaidTotal').textContent=money(unpaidTotal); $('#balanceTotal').textContent=money(balanceTotal);
+}
+
+function switchView(view){
+  $$('.view').forEach(v=>v.classList.remove('active'));
+  $$('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(view==='calendar'){$('#calendarView').classList.add('active');$('.nav-btn[data-view="calendar"]').classList.add('active');}
+  else{$('#studentsView').classList.add('active');$('.nav-btn[data-view="students"]').classList.add('active');}
+}
+
+function openBackdrop(){ $('#modalBackdrop').classList.remove('hidden'); }
+function closeSheets(){
+  $$('.sheet').forEach(s=>s.classList.add('hidden')); $('#modalBackdrop').classList.add('hidden');
+  editingLessonId=null; editingStudentId=null;
+}
+
+function fillStudentSelect(){
+  $('#lessonStudent').innerHTML = state.students.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+}
+function openLesson(id=null, presetDate=null){
+  if(!state.students.length){ openStudent(); return; }
+  editingLessonId=id; fillStudentSelect();
+  const m=$('#lessonModal'); $('#lessonModalTitle').textContent=id?'Подія':'Додати заняття';
+  $('#deleteLesson').classList.toggle('hidden',!id); $('#lessonStatusBlock').classList.toggle('hidden',!id);
+  if(id){
+    const l=lessonById(id); lessonPaidDraft=!!l.paid;
+    $('#lessonStudent').value=l.studentId; $('#lessonPrice').value=l.price; $('#lessonDate').value=l.date;
+    $('#lessonStart').value=l.start; $('#lessonEnd').value=l.end; $('#lessonDuration').value=durationText(l.start,l.end);
+    $('#lessonRepeat').checked=false; $('#lessonNote').value=l.note||'';
+  }else{
+    const sid=state.students[0].id; lessonPaidDraft=false; $('#lessonStudent').value=sid;
+    $('#lessonPrice').value=studentById(sid).price; $('#lessonDate').value=presetDate||isoDate(new Date());
+    $('#lessonStart').value='16:00'; $('#lessonEnd').value='17:00'; $('#lessonDuration').value='1 год';
+    $('#lessonRepeat').checked=false; $('#lessonNote').value='';
+  }
+  refreshPaidButton();
+  openBackdrop(); m.classList.remove('hidden');
+}
+
+function refreshPaidButton(){
+  const b=$('#togglePaid'); b.textContent=lessonPaidDraft?'Оплачено':'Не оплачено';
+  b.className=`status-pill ${lessonPaidDraft?'paid':'unpaid'}`;
+}
+
+function openStudent(id=null){
+  editingStudentId=id; $('#studentModalTitle').textContent=id?'Редагування учня':'Додати учня'; $('#deleteStudent').classList.toggle('hidden',!id);
+  if(id){const s=studentById(id); $('#studentName').value=s.name; $('#studentClass').value=s.cls||''; $('#studentPrice').value=s.price; $('#studentColor').value=s.color;}
+  else{$('#studentName').value='';$('#studentClass').value='';$('#studentPrice').value=350;$('#studentColor').value='#8b5cf6';}
+  openBackdrop(); $('#studentModal').classList.remove('hidden');
+}
+
+function openStudentCard(id){
+  selectedStudentId=id; const s=studentById(id), c=calcStudent(id);
+  $('#studentCardTitle').textContent=s.name;
+  $('#studentCardBalance').textContent=(c.balance>0?'+':'')+money(c.balance);
+  $('#studentCardBalance').className='big-balance '+(c.balance>0?'positive':c.balance<0?'negative':'zero');
+  $('#studentCardUnpaid').textContent=money(c.unpaid); $('#studentCardReceived').textContent=money(c.received);
+  $('#paymentPanel').classList.add('hidden'); $('#paymentAmount').value=''; $('#paymentNote').value='';
+  const ph=$('#paymentHistory'); ph.innerHTML='';
+  state.payments.filter(p=>p.studentId===id).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8).forEach(p=>{
+    ph.innerHTML+=`<div class="history-item"><div><div class="history-title">${escapeHtml(p.note||'Оплата')}</div><div class="history-sub">${formatDate(p.date)}</div></div><div class="history-amount positive">+${money(p.amount)}</div></div>`;
+  });
+  if(!ph.innerHTML)ph.innerHTML='<div class="empty">Оплат ще немає</div>';
+  const lh=$('#lessonHistory'); lh.innerHTML='';
+  state.lessons.filter(l=>l.studentId===id).sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start)).slice(0,8).forEach(l=>{
+    lh.innerHTML+=`<div class="history-item"><div><div class="history-title">${formatDate(l.date)} · ${l.start}</div><div class="history-sub">${escapeHtml(l.note||'Заняття')}</div></div><div class="history-amount ${l.paid?'positive':'negative'}">${l.paid?'Оплачено':'Не оплачено'}</div></div>`;
+  });
+  if(!lh.innerHTML)lh.innerHTML='<div class="empty">Занять ще немає</div>';
+  openBackdrop(); $('#studentCardModal').classList.remove('hidden');
+}
+
+function formatDate(ds){ const d=parseDate(ds); return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`; }
+function escapeHtml(str=''){return str.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+$('#lessonForm').onsubmit=e=>{
+  e.preventDefault();
+  const base={
+    studentId:$('#lessonStudent').value, price:Number($('#lessonPrice').value), date:$('#lessonDate').value,
+    start:$('#lessonStart').value, end:$('#lessonEnd').value, note:$('#lessonNote').value.trim(),
+    paid:editingLessonId?lessonPaidDraft:false
+  };
+  if(editingLessonId){ Object.assign(lessonById(editingLessonId),base); }
+  else if($('#lessonRepeat').checked){
+    const d=parseDate(base.date);
+    for(let i=0;i<26;i++){ state.lessons.push({...base,id:crypto.randomUUID(),date:isoDate(addDays(d,i*7))}); }
+  }else state.lessons.push({...base,id:crypto.randomUUID()});
+  save(); closeSheets(); renderAll();
+};
+
+$('#studentForm').onsubmit=e=>{
+  e.preventDefault();
+  const data={name:$('#studentName').value.trim(),cls:$('#studentClass').value.trim(),price:Number($('#studentPrice').value),color:$('#studentColor').value};
+  if(editingStudentId) Object.assign(studentById(editingStudentId),data);
+  else state.students.push({...data,id:crypto.randomUUID()});
+  save(); closeSheets(); renderAll();
+};
+
+$('#deleteLesson').onclick=()=>{
+  if(!editingLessonId)return;
+  if(confirm('Видалити це заняття?')){state.lessons=state.lessons.filter(l=>l.id!==editingLessonId);save();closeSheets();renderAll();}
+};
+$('#deleteStudent').onclick=()=>{
+  if(!editingStudentId)return;
+  if(confirm('Видалити учня та всі його заняття й оплати?')){
+    state.students=state.students.filter(s=>s.id!==editingStudentId);
+    state.lessons=state.lessons.filter(l=>l.studentId!==editingStudentId);
+    state.payments=state.payments.filter(p=>p.studentId!==editingStudentId);
+    save();closeSheets();renderAll();
+  }
+};
+$('#togglePaid').onclick=()=>{lessonPaidDraft=!lessonPaidDraft;refreshPaidButton();};
+$('#lessonStudent').onchange=()=>{const s=studentById($('#lessonStudent').value); if(s)$('#lessonPrice').value=s.price;};
+['lessonStart','lessonEnd'].forEach(id=>$('#'+id).addEventListener('input',()=>$('#lessonDuration').value=durationText($('#lessonStart').value,$('#lessonEnd').value)));
+
+$('#openPaymentForm').onclick=()=>$('#paymentPanel').classList.toggle('hidden');
+$('#savePayment').onclick=()=>{
+  const amount=Number($('#paymentAmount').value); if(!amount||amount<=0)return alert('Введи суму оплати');
+  state.payments.push({id:crypto.randomUUID(),studentId:selectedStudentId,amount,date:isoDate(new Date()),note:$('#paymentNote').value.trim()});
+  save(); openStudentCard(selectedStudentId); renderStudents();
+};
+$('#editStudentFromCard').onclick=()=>{const id=selectedStudentId; closeSheets(); openStudent(id);};
+
+$('#addLessonTop').onclick=()=>openLesson();
+$('#addStudentTop').onclick=()=>openStudent();
+$('#prevWeek').onclick=()=>{currentWeek=addDays(currentWeek,-7);renderAll();};
+$('#nextWeek').onclick=()=>{currentWeek=addDays(currentWeek,7);renderAll();};
+$$('.nav-btn').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+$$('.close-sheet').forEach(b=>b.onclick=closeSheets);
+$('#modalBackdrop').onclick=closeSheets;
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+seedDemo();
+renderAll();
+
+  </script>
+</body>
+</html>
