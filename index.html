@@ -51,7 +51,7 @@ button{cursor:pointer}
 .studentRow{background:#fff;border:0;border-bottom:1px solid var(--line);width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;text-align:left}
 .dot{width:12px;height:12px;border-radius:50%;flex:0 0 12px}
 .smain{flex:1;min-width:0}.sname{font-weight:800;display:block}.ssub{display:block;font-size:12px;color:var(--muted);margin-top:3px}
-.sright{text-align:right}.bal{font-weight:800}.unpaid{font-size:11px;color:var(--muted);margin-top:3px}
+.sright{text-align:right;display:flex;flex-direction:column;align-items:flex-end}.bal{font-weight:800}.unpaid{display:block;font-size:11px;color:var(--muted);margin-top:3px;max-width:150px;line-height:1.2}
 .emptyState{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--muted)}
 .emptyState b{color:var(--text);font-size:20px;margin-bottom:8px}
 .modal{position:fixed;inset:0;background:#fff;z-index:100;display:none;flex-direction:column}
@@ -156,7 +156,7 @@ const GEN=['січня','лютого','березня','квітня','трав
 const HSTART=8,HEND=23,HOURPX=66;
 const KEY='miy_repetytor_v4_2_8';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='4.3.0';
+const APP_VERSION='4.3.1';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -249,14 +249,21 @@ function stats(id){
   const ps=state.data.payments.filter(p=>p.studentId===id);
   const ls=state.data.lessons.filter(l=>l.studentId===id);
   const received=ps.reduce((a,p)=>a+Number(p.amount||0),0);
-  const now=new Date();
-  const dueLessons=ls.filter(l=>l.status!=='cancelled' && lessonMoment(l)<=now);
+  // Баланс змінюється тільки після статусу «Проведено».
+  // Заплановані, скасовані та «Не прийшов» самі по собі передоплату не списують.
+  const dueLessons=ls.filter(l=>l.status==='conducted');
   const dueTotal=dueLessons.reduce((a,l)=>a+Number(l.price||0),0);
   const paidMarked=dueLessons.filter(l=>l.paid).reduce((a,l)=>a+Number(l.price||0),0);
-  // Єдиний баланс учня: отримані гроші мінус усі заняття, що вже відбулися.
-  // + = передоплата, 0 = розраховано, - = борг.
   const balance=received-dueTotal;
   return {received,dueTotal,spent:paidMarked,balance,debt:Math.max(0,-balance),prepaid:Math.max(0,balance),lessons:ls,payments:ps}
+}
+function prepayCoverage(st,z){
+  const balance=Number(z?.balance||0), price=Number(st?.price||0);
+  if(balance<=0 || price<=0)return '';
+  const count=Math.floor(balance/price), rest=Math.round((balance-count*price)*100)/100;
+  if(count<=0)return `Залишок ${money(balance)}`;
+  const word=(count%10===1 && count%100!==11)?'заняття':'занять';
+  return `Вистачить на ${count} ${word}${rest>0?` · залишок ${money(rest)}`:''}`;
 }
 function closeAllModals(){
   document.querySelectorAll('.modal.open').forEach(m=>m.classList.remove('open'));
@@ -291,19 +298,28 @@ window.addEventListener('popstate',e=>{
 history.replaceState({tab:state.tab},'');
 
 function processAutoPay(){
-  const now=new Date();
   let changed=false;
+
+  // Якщо автооплачене заняття повернули зі статусу «Проведено» назад,
+  // звільняємо передоплату й прибираємо автоматичну позначку «Оплачено».
+  state.data.lessons.forEach(l=>{
+    if(l.autoPaid && l.status!=='conducted'){
+      l.paid=false;
+      l.autoPaid=false;
+      changed=true;
+    }
+  });
 
   state.data.students.forEach(st=>{
     if(st.autoPay===false)return;
 
-    // Для позначки ✓ використовуємо реальний пул внесених оплат.
-    // Баланс у списку учнів рахується окремо: оплати мінус усі проведені заняття.
+    // Автооплата працює ТІЛЬКИ для занять зі статусом «Проведено».
+    // Сам факт, що час заняття минув, більше нічого не списує.
     let z=stats(st.id);
     let available=Math.max(0,z.received-z.spent);
 
     const eligible=state.data.lessons
-      .filter(l=>l.studentId===st.id && l.status!=='cancelled' && !l.paid && lessonMoment(l)<=now)
+      .filter(l=>l.studentId===st.id && l.status==='conducted' && !l.paid)
       .sort((a,b)=>(a.date+(a.end||'')).localeCompare(b.date+(b.end||'')));
 
     eligible.forEach(l=>{
@@ -497,7 +513,7 @@ function renderStudents(){
     return `<button class="studentRow" data-id="${st.id}">
       <span class="dot" style="background:${st.color}"></span>
       <span class="smain"><span class="sname">${esc(st.name)}</span><span class="ssub">${esc(st.cls||'Без класу')} · ${money(st.price)}</span></span>
-      <span class="sright"><span class="bal" style="color:${bc}">${z.balance>0?'+':''}${money(z.balance)}</span></span>
+      <span class="sright"><span class="bal" style="color:${bc}">${z.balance>0?'+':''}${money(z.balance)}</span>${z.balance>0?`<span class="unpaid">${esc(prepayCoverage(st,z))}</span>`:''}</span>
     </button>`
   }).join('');
   document.getElementById('main').innerHTML=`<div class="students">
@@ -929,7 +945,7 @@ function openCard(id){
   const ls=[...z.lessons].sort((a,b)=>(b.date+b.start).localeCompare(a.date+a.start)).slice(0,12);
   m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">${esc(st.name)}</div><button id="editSt" style="border:0;background:transparent;color:var(--accent);font-weight:800">Редагувати</button></div>
   <div class="mbody"><div class="bigbal" style="color:${z.balance>0?'var(--good)':z.balance<0?'var(--bad)':'var(--text)'}">${z.balance>0?'+':''}${money(z.balance)}</div>
-  <div class="summary" style="margin-top:-8px">${z.balance>0?'Передоплата':z.balance<0?'Борг':'Розраховано'}</div>
+  <div class="summary" style="margin-top:-8px">${z.balance>0?'Передоплата':z.balance<0?'Борг':'Розраховано'}</div>${z.balance>0?`<div class="summary" style="margin-top:4px;color:var(--good);font-weight:800">${esc(prepayCoverage(st,z))}</div>`:''}
   <div class="section">Внести оплату</div><div><label>Сума</label><input id="payAmount" type="number" placeholder="1400"></div><div><label>Коментар</label><input id="payNote" placeholder="Напр. Mono, за вересень"></div><button class="primary" id="addPay">Додати оплату</button>
   <div class="section">Останні оплати</div>${ps.length?ps.map(p=>`<div class="history"><div><div class="h1">${esc(p.note||'Оплата')}</div><div class="h2">${fmt(p.date)}</div></div><b style="color:var(--good)">+${money(p.amount)}</b></div>`).join(''):'<div class="empty">Оплат ще немає</div>'}
   <div class="section">Останні заняття</div>${ls.length?ls.map(l=>`<div class="history"><div><div class="h1">${fmt(l.date)} · ${l.start}</div><div class="h2">${esc(l.note||'Заняття')} · ${statusLabel(l.status)}</div></div><b style="color:${l.paid?'var(--good)':'var(--bad)'}">${l.paid?'Оплачено':'Не оплачено'}</b></div>`).join(''):'<div class="empty">Занять ще немає</div>'}</div>`;
