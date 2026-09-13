@@ -635,7 +635,12 @@ function renderFinance(){
   const schoolIncome=salary+advance+other, total=tutor+schoolIncome;
   const prepaid=state.data.students.reduce((a,s)=>a+stats(s.id).prepaid,0);
   const expected=state.data.students.reduce((a,s)=>a+stats(s.id).debt,0);
-  const conducted=state.data.lessons.filter(l=>l.status==='conducted' && periodMatch(l.date));
+  const periodLessons=state.data.lessons.filter(l=>periodMatch(l.date));
+  const conducted=periodLessons.filter(l=>l.status==='conducted');
+  const plannedLessons=periodLessons.filter(l=>(l.status||'planned')==='planned');
+  const earningPlanLessons=periodLessons.filter(l=>l.status!=='cancelled');
+  const possibleEarnings=earningPlanLessons.reduce((a,l)=>a+Number(l.price||0),0);
+  const remainingPlanValue=plannedLessons.reduce((a,l)=>a+Number(l.price||0),0);
   const conductedValue=conducted.reduce((a,l)=>a+Number(l.price||0),0);
   const avgLesson=conducted.length?conductedValue/conducted.length:0;
   const schoolCount=state.data.schoolLessons.filter(l=>periodMatch(l.date) && !isVacationDate(l.date,l.classId)).length;
@@ -665,6 +670,8 @@ function renderFinance(){
       <div class="finCard"><small>Зарплата</small><b>${money(salary)}</b></div><div class="finCard"><small>Аванс</small><b>${money(advance)}</b></div>
       <div class="finCard"><small>Інше</small><b>${money(other)}</b></div><div class="finCard"><small>Передоплати учнів</small><b>${money(prepaid)}</b></div>
       <div class="finCard"><small>Борги учнів</small><b>${money(expected)}</b></div><div class="finCard"><small>Проведено занять</small><b>${conducted.length}</b></div>
+      <div class="finCard"><small>${mode==='month'?'Можливий заробіток за місяць':'Плановий дохід за рік'}</small><b>${money(possibleEarnings)}</b></div>
+      <div class="finCard"><small>Залишилось за планом</small><b>${plannedLessons.length} · ${money(remainingPlanValue)}</b></div>
     </div>
     <div class="analytics">
       <div class="analyticsBox"><div class="analyticsTitle">Аналітика</div><div class="metricGrid">
