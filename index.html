@@ -64,6 +64,8 @@ input,textarea,select{width:100%;border:1px solid var(--line);border-radius:11px
 textarea{min-height:80px;resize:vertical}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .primary{border:0;background:var(--accent);color:#fff;border-radius:12px;padding:14px;font-weight:800}
+.secondary{border:1px solid #d9d3ff;background:#f7f5ff;color:var(--accent);border-radius:12px;padding:13px;font-weight:800;width:100%}
+.moveBox{display:none;border:1px solid var(--line);background:#faf9ff;border-radius:14px;padding:12px;gap:10px}.moveBox.open{display:grid}.moveBox .row2{margin:0}
 .switchrow,.paybox{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px}
 .pill{border:0;border-radius:999px;padding:9px 12px;font-weight:800}
 .palette{display:flex;flex-wrap:wrap;gap:10px}.c{width:34px;height:34px;border-radius:50%;border:3px solid transparent}.c.sel{border-color:#222}
@@ -572,7 +574,14 @@ function openTutorLesson(l=null,preset={}){
       <div id="repeatUntil" class="repeatUntil"><label>Повторювати до</label><input id="lfRepeatUntil" type="date" value="${repeatUntilDefault(val.date)}"></div>`:''}
     <div><label>Статус</label><select id="lfStatus">${statusOptionsHtml(val.status)}</select></div>
     <div><label>Примітка</label><textarea id="lfNote" placeholder="Необов’язково">${esc(val.note)}</textarea></div>
-    ${l?`<div class="paybox"><b>Оплата</b><button id="paidBtn" class="pill" style="background:${val.paid?'#dcfce7':'#fee2e2'};color:${val.paid?'#15803d':'#b91c1c'}">${val.paid?'Оплачено':'Не оплачено'}</button></div>`:''}
+    ${l?`<div class="paybox"><b>Оплата</b><button id="paidBtn" class="pill" style="background:${val.paid?'#dcfce7':'#fee2e2'};color:${val.paid?'#15803d':'#b91c1c'}">${val.paid?'Оплачено':'Не оплачено'}</button></div>
+    <button class="secondary" id="moveLessonBtn">↪ Перенести заняття</button>
+    <div class="moveBox" id="moveLessonBox">
+      <div><label>Нова дата</label><input id="moveDate" type="date" value="${val.date}"></div>
+      <div class="row2"><div><label>Початок</label><input id="moveStart" type="time" value="${val.start}"></div><div><label>Кінець</label><input id="moveEnd" type="time" value="${val.end}"></div></div>
+      <small style="color:var(--muted)">Якщо це заняття із серії, перенесеться лише воно. Решта серії не зміниться.</small>
+      <button class="primary" id="confirmMoveLesson">Перенести</button>
+    </div>`:''}
     <button class="primary" id="saveLesson">Зберегти</button>
   </div>`;
   openModal(m,'tutorLesson'); m.querySelector('.close').onclick=()=>closeModal(m);
@@ -583,6 +592,18 @@ function openTutorLesson(l=null,preset={}){
   if(l)m.querySelector('.trash').onclick=()=>deleteTutorLesson(l,m);
   let paid=val.paid;
   if(l)document.getElementById('paidBtn').onclick=()=>{paid=!paid;const b=document.getElementById('paidBtn');b.textContent=paid?'Оплачено':'Не оплачено';b.style.background=paid?'#dcfce7':'#fee2e2';b.style.color=paid?'#15803d':'#b91c1c'};
+  if(l){
+    const moveBtn=document.getElementById('moveLessonBtn'), moveBox=document.getElementById('moveLessonBox');
+    moveBtn.onclick=()=>{moveBox.classList.toggle('open'); if(moveBox.classList.contains('open'))document.getElementById('moveDate').focus()};
+    document.getElementById('confirmMoveLesson').onclick=()=>{
+      const date=document.getElementById('moveDate').value, start=document.getElementById('moveStart').value, end=document.getElementById('moveEnd').value;
+      if(!date||!start||!end)return alert('Вкажи нову дату і час.');
+      if(mins(end)<=mins(start))return alert('Час завершення має бути пізніше за початок.');
+      const moved={...l,date,start,end,seriesId:null};
+      state.data.lessons=state.data.lessons.map(x=>x.id===l.id?moved:x);
+      save();finishModalSave(m);
+    };
+  }
   document.getElementById('lfStudent').onchange=e=>{const st=student(e.target.value);if(st&&!l)document.getElementById('lfPrice').value=st.price};
   document.getElementById('saveLesson').onclick=()=>{
     const obj={id:l?.id||uid(),studentId:document.getElementById('lfStudent').value,price:Number(document.getElementById('lfPrice').value||0),date:document.getElementById('lfDate').value,start:document.getElementById('lfStart').value,end:document.getElementById('lfEnd').value,note:document.getElementById('lfNote').value.trim(),status:document.getElementById('lfStatus').value,paid,autoPaid:l?.autoPaid||false,seriesId:l?.seriesId||null,paidAt:l?.paidAt||null};
