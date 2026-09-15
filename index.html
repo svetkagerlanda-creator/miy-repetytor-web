@@ -164,10 +164,15 @@ textarea{min-height:80px;resize:vertical}
 const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 const MONTHS=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const GEN=['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
-const HSTART=8,HEND=23,HOURPX=66;
+const CALSETKEY='miy_repetytor_calendar_settings';
+let calendarSettings=(()=>{try{return {...{start:8,end:23},...JSON.parse(localStorage.getItem(CALSETKEY)||'{}')}}catch(_){return {start:8,end:23}}})();
+function saveCalendarSettings(){localStorage.setItem(CALSETKEY,JSON.stringify(calendarSettings))}
+function calStart(){return Math.max(0,Math.min(23,Number(calendarSettings.start)||8))}
+function calEnd(){return Math.max(calStart()+1,Math.min(24,Number(calendarSettings.end)||23))}
+const HOURPX=66;
 const KEY='miy_repetytor_v4_2_8';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='5.0.0';
+const APP_VERSION='5.1.0';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -217,6 +222,7 @@ function normalizeData(){
   state.data.students ||= [];
   state.data.lessons ||= [];
   state.data.payments ||= [];
+  state.data.lessons.forEach(l=>{if(!l.mode)l.mode='inperson'});
   state.data.income ||= [];
   state.data.schoolLessons ||= [];
   state.data.schoolClasses ||= [];
@@ -368,26 +374,26 @@ function renderCalendar(){
 
   let heads='<div class="timeHead"></div>';
   for(let i=0;i<7;i++){let d=addDays(week,i);heads+=`<div class="dayhead"><div class="n">${d.getDate()}</div><div class="d">${DAYS[i]}</div></div>`}
-  let times='';for(let h=HSTART;h<HEND;h++) times+=`<div class="time">${h}</div>`;
+  let times='';for(let h=calStart();h<calEnd();h++) times+=`<div class="time">${h}</div>`;
   let cols='';
   for(let i=0;i<7;i++){
     const d=iso(addDays(week,i));
-    let lines='';for(let h=HSTART;h<HEND;h++) lines+='<div class="hourline"></div>';
+    let lines='';for(let h=calStart();h<calEnd();h++) lines+='<div class="hourline"></div>';
     const tutor=state.data.lessons.filter(l=>l.date===d).map(l=>{
       const st=student(l.studentId);if(!st)return '';
-      const top=(mins(l.start)-HSTART*60)/60;
+      const top=(mins(l.start)-calStart()*60)/60;
       const dur=Math.max(.35,(mins(l.end)-mins(l.start))/60);
       const statusClass=l.status==='cancelled'?' cancelled':l.status==='no_show'?' no_show':'';
       const statusMini=l.status==='cancelled'?' · ×':l.status==='no_show'?' · !':'';
       return `<button class="lesson${statusClass}" data-kind="tutor" data-id="${l.id}" style="top:calc(var(--hour) * ${top});height:calc(var(--hour) * ${dur} - 2px);background:${st.color}">
-        <div class="name">${esc(st.name)}${statusMini}</div><div class="meta">${money(l.price)} <span class="paidmark">${l.paid?'✓':''}</span></div>
+        <div class="name">${esc(st.name)}${st.cls?` · ${esc(st.cls)}`:''}${statusMini}</div><div class="meta">${l.mode==='remote'?'💻':'🏫'} ${money(l.price)} <span class="paidmark">${l.paid?'✓':''}</span></div>
       </button>`
     }).join('');
     const school=state.data.schoolLessons.filter(l=>l.date===d && !isVacationDate(l.date,l.classId)).map(l=>{
       const cl=state.data.schoolClasses.find(c=>c.id===l.classId);
       const sub=cl?.subjects?.find(s=>s.id===l.subjectId);
       if(!cl||!sub)return '';
-      const top=(mins(l.start)-HSTART*60)/60;
+      const top=(mins(l.start)-calStart()*60)/60;
       const dur=Math.max(.35,(mins(l.end)-mins(l.start))/60);
       const bg=sub.color||'#64748b',fg=contrastText(bg);
       return `<button class="lesson school" data-kind="school" data-id="${l.id}" style="top:calc(var(--hour) * ${top});height:calc(var(--hour) * ${dur} - 2px);background:${bg};color:${fg}">
@@ -402,8 +408,8 @@ function renderCalendar(){
   document.querySelectorAll('.daycol').forEach(col=>col.onclick=e=>{
     if(e.target.closest('.lesson'))return;
     const rect=col.getBoundingClientRect(), y=Math.max(0,Math.min(rect.height,e.clientY-rect.top));
-    const minutesSpan=(HEND-HSTART)*60;
-    const raw=HSTART*60 + (y/rect.height)*minutesSpan;
+    const minutesSpan=(calEnd()-calStart())*60;
+    const raw=calStart()*60 + (y/rect.height)*minutesSpan;
     const total=Math.round(raw/15)*15;
     const hh=pad(Math.floor(total/60)), mm=pad(total%60), endM=total+60;
     openEventChoice({date:col.dataset.date,start:`${hh}:${mm}`,end:`${pad(Math.floor(endM/60))}:${pad(endM%60)}`});
@@ -420,7 +426,7 @@ function openToday(){
     if(it.kind==='tutor'){
       const l=it.obj,st=student(l.studentId); if(!st)return '';
       return `<div class="todayItem ${l.status==='cancelled'?'cancelled':''}" style="--item-color:${st.color}">
-        <div class="todayRow"><div><div class="todayName">${esc(st.name)}</div><div class="todaySub">${money(l.price)} · ${l.paid?'Оплачено':'Не оплачено'}</div></div><div class="todayTime">${l.start}–${l.end}</div></div>
+        <div class="todayRow"><div><div class="todayName">${esc(st.name)}${st.cls?` · ${esc(st.cls)}`:''}</div><div class="todaySub">${l.mode==='remote'?'💻 Онлайн':'🏫 Очно'} · ${money(l.price)} · ${l.paid?'Оплачено':'Не оплачено'}</div></div><div class="todayTime">${l.start}–${l.end}</div></div>
         <span class="statusTag ${l.status||'planned'}">${statusLabel(l.status)}</span>
         <select class="statusSelect" data-today-status="${l.id}">${statusOptionsHtml(l.status||'planned')}</select>
         <button class="choiceBtn" style="margin-top:8px;padding:10px" data-open-tutor="${l.id}">Відкрити заняття</button>
@@ -739,6 +745,7 @@ function openAppMenu(){
       <button class="menuItem" id="shareApp">↗ Поділитися застосунком<small>Надіслати посилання колезі</small></button>
       <button class="menuItem" id="exportBackup">💾 Експорт резервної копії<small>Зберегти всі дані одним JSON-файлом</small></button>
       <button class="menuItem" id="importBackup">📥 Імпорт резервної копії<small>Відновити дані із збереженого файлу</small></button>
+      <button class="menuItem" id="calendarSettingsBtn">🕐 Налаштування календаря<small>Видимі години дня</small></button>
       <button class="menuItem" id="aboutApp">ⓘ Про застосунок<small>Версія ${APP_VERSION}</small></button>
     </div>
   </div>`;
@@ -748,6 +755,11 @@ function openAppMenu(){
   document.getElementById('shareApp').onclick=shareApp;
   document.getElementById('exportBackup').onclick=exportBackup;
   document.getElementById('importBackup').onclick=()=>document.getElementById('backupInput').click();
+  document.getElementById('calendarSettingsBtn').onclick=()=>{
+    m.querySelector('.mbody').innerHTML=`<div><label>Показувати календар з</label><select id="calStartSet">${Array.from({length:24},(_,h)=>`<option value="${h}" ${h===calStart()?'selected':''}>${pad(h)}:00</option>`).join('')}</select></div><div><label>Показувати календар до</label><select id="calEndSet">${Array.from({length:24},(_,i)=>i+1).map(h=>`<option value="${h}" ${h===calEnd()?'selected':''}>${pad(h%24)}:00</option>`).join('')}</select></div><button class="primary" id="saveCalSettings">Зберегти</button><button class="secondary" id="backToMenu">← Назад</button>`;
+    document.getElementById('saveCalSettings').onclick=()=>{const a=Number(document.getElementById('calStartSet').value),b=Number(document.getElementById('calEndSet').value);if(b<=a)return alert('Час завершення має бути пізніше за початок.');calendarSettings={start:a,end:b};saveCalendarSettings();m.classList.remove('open');history.replaceState({tab:state.tab},'');render()};
+    document.getElementById('backToMenu').onclick=()=>openAppMenu();
+  };
   document.getElementById('aboutApp').onclick=()=>{
     m.querySelector('.mbody').innerHTML=`<div class="aboutBox"><b>Мій репетитор</b><br>Версія ${APP_VERSION}<br><br>Календар для школи й репетиторства, учні, класи, оплати та фінанси. Дані зберігаються локально на цьому пристрої, тому резервні копії краще робити регулярно.</div><button class="secondary" id="backToMenu">← Назад</button>`;
     document.getElementById('backToMenu').onclick=()=>{m.classList.remove('open');history.replaceState({tab:state.tab},'');openAppMenu()};
@@ -843,15 +855,16 @@ function repeatDates(startDate,untilDate){
 function openTutorLesson(l=null,preset={}){
   const m=document.getElementById('lessonModal');
   const st0=l?student(l.studentId):state.data.students[0];
-  const val={studentId:l?.studentId||st0?.id||'',price:l?.price??st0?.price??350,date:l?.date||preset.date||iso(new Date()),start:l?.start||preset.start||'16:00',end:l?.end||preset.end||'17:00',note:l?.note||'',paid:!!l?.paid,status:l?.status||'planned'};
+  const val={studentId:l?.studentId||st0?.id||'',price:l?.price??st0?.price??350,date:l?.date||preset.date||iso(new Date()),start:l?.start||preset.start||'16:00',end:l?.end||preset.end||'17:00',note:l?.note||'',paid:!!l?.paid,status:l?.status||'planned',mode:l?.mode||'inperson'};
   m.innerHTML=`<div class="mhead"><button class="close">×</button><div class="title">${l?'Заняття':'Додати заняття'}</div>${l?'<button class="trash">🗑</button>':''}</div>
   <div class="mbody">
     <div><label>Учень</label><select id="lfStudent">${state.data.students.map(s=>`<option value="${s.id}" ${s.id===val.studentId?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
     <div><label>Вартість заняття</label><input id="lfPrice" type="number" value="${val.price}"></div>
+    <div><label>Формат</label><select id="lfMode"><option value="inperson" ${val.mode==='inperson'?'selected':''}>Очно</option><option value="remote" ${val.mode==='remote'?'selected':''}>Онлайн</option></select></div>
     <div><label>Дата</label><input id="lfDate" type="date" value="${val.date}"></div>
     <div class="row2"><div><label>Початок</label><input id="lfStart" type="time" value="${val.start}"></div><div><label>Кінець</label><input id="lfEnd" type="time" value="${val.end}"></div></div>
     ${!l?`<div class="switchrow"><span><b>Повторювати щотижня</b><br><small style="color:var(--muted)">До вибраної дати</small></span><input id="lfRepeat" type="checkbox" style="width:auto;min-height:auto"></div>
-      <div id="repeatUntil" class="repeatUntil"><label>Повторювати до</label><input id="lfRepeatUntil" type="date" value="${repeatUntilDefault(val.date)}"></div>`:''}
+      <div id="repeatUntil" class="repeatUntil"><label>Повторювати до</label><input id="lfRepeatUntil" type="date" value="${repeatUntilDefault(val.date)}"><div id="extraSlots"></div><button type="button" class="secondary" id="addRepeatSlot" style="margin-top:10px">+ Ще один день / час</button></div>`:''}
     <div><label>Статус</label><select id="lfStatus">${statusOptionsHtml(val.status)}</select></div>
     <div><label>Примітка</label><textarea id="lfNote" placeholder="Необов’язково">${esc(val.note)}</textarea></div>
     ${l?`<div class="paybox"><b>Оплата</b><button id="paidBtn" class="pill" style="background:${val.paid?'#dcfce7':'#fee2e2'};color:${val.paid?'#15803d':'#b91c1c'}">${val.paid?'Оплачено':'Не оплачено'}</button></div>
@@ -868,6 +881,7 @@ function openTutorLesson(l=null,preset={}){
   if(!l){
     const rep=document.getElementById('lfRepeat'), until=document.getElementById('repeatUntil');
     rep.onchange=()=>until.style.display=rep.checked?'block':'none';
+    let slotNo=0; document.getElementById('addRepeatSlot').onclick=()=>{slotNo++;const box=document.getElementById('extraSlots'),row=document.createElement('div');row.className='subjectEditor';row.dataset.extraSlot='1';row.innerHTML=`<div class="subjectHead"><b>Додатковий час</b><button type="button" class="miniDelete">Видалити</button></div><div><label>Перша дата</label><input class="extraDate" type="date" value="${document.getElementById('lfDate').value}"></div><div class="row2"><div><label>Початок</label><input class="extraStart" type="time" value="${document.getElementById('lfStart').value}"></div><div><label>Кінець</label><input class="extraEnd" type="time" value="${document.getElementById('lfEnd').value}"></div></div>`;row.querySelector('.miniDelete').onclick=()=>row.remove();box.appendChild(row)};
   }
   if(l)m.querySelector('.trash').onclick=()=>deleteTutorLesson(l,m);
   let paid=val.paid;
@@ -886,7 +900,7 @@ function openTutorLesson(l=null,preset={}){
   }
   document.getElementById('lfStudent').onchange=e=>{const st=student(e.target.value);if(st&&!l)document.getElementById('lfPrice').value=st.price};
   document.getElementById('saveLesson').onclick=()=>{
-    const obj={id:l?.id||uid(),studentId:document.getElementById('lfStudent').value,price:Number(document.getElementById('lfPrice').value||0),date:document.getElementById('lfDate').value,start:document.getElementById('lfStart').value,end:document.getElementById('lfEnd').value,note:document.getElementById('lfNote').value.trim(),status:document.getElementById('lfStatus').value,paid,autoPaid:l?.autoPaid||false,seriesId:l?.seriesId||null,paidAt:l?.paidAt||null};
+    const obj={id:l?.id||uid(),studentId:document.getElementById('lfStudent').value,price:Number(document.getElementById('lfPrice').value||0),date:document.getElementById('lfDate').value,start:document.getElementById('lfStart').value,end:document.getElementById('lfEnd').value,note:document.getElementById('lfNote').value.trim(),mode:document.getElementById('lfMode').value,status:document.getElementById('lfStatus').value,paid,autoPaid:l?.autoPaid||false,seriesId:l?.seriesId||null,paidAt:l?.paidAt||null};
     if(mins(obj.end)<=mins(obj.start))return alert('Час завершення має бути пізніше за початок.');
     if(l){
       // Ручна ✓ = гроші реально отримані. Створюємо одне пов'язане надходження.
@@ -899,6 +913,7 @@ function openTutorLesson(l=null,preset={}){
         const until=document.getElementById('lfRepeatUntil').value;
         if(!until||until<obj.date)return alert('Перевір дату завершення повторення.');
         const sid=uid();repeatDates(obj.date,until).forEach(date=>state.data.lessons.push({...obj,id:uid(),date,seriesId:sid,paid:false,autoPaid:false,status:'planned'}));
+        for(const row of document.querySelectorAll('[data-extra-slot]')){const date=row.querySelector('.extraDate').value,start=row.querySelector('.extraStart').value,end=row.querySelector('.extraEnd').value;if(!date||!start||!end)continue;if(mins(end)<=mins(start))return alert('Перевір час у додатковому занятті.');if(date>until)return alert('Перша дата додаткового заняття пізніше завершення повторення.');const sid2=uid();repeatDates(date,until).forEach(d=>state.data.lessons.push({...obj,id:uid(),date:d,start,end,seriesId:sid2,paid:false,autoPaid:false,status:'planned'}))}
       }else state.data.lessons.push(obj);
       save();finishModalSave(m);return;
     }
@@ -982,12 +997,12 @@ function editTutorSeries(old,obj,parent){
       const base=fromIso(obj.date), oldBase=fromIso(old.date);
       items.filter(x=>x.date>=old.date).forEach(x=>{
         const weeks=Math.round((fromIso(x.date)-oldBase)/(7*86400000));
-        Object.assign(x,{studentId:obj.studentId,price:obj.price,start:obj.start,end:obj.end,note:obj.note,date:iso(addDays(base,weeks*7))});
+        Object.assign(x,{studentId:obj.studentId,price:obj.price,mode:obj.mode,start:obj.start,end:obj.end,note:obj.note,date:iso(addDays(base,weeks*7))});
         if(x.id===old.id){x.paid=obj.paid;x.autoPaid=obj.autoPaid;x.status=obj.status}
       });
     }else{
       const delta=Math.round((fromIso(obj.date)-fromIso(old.date))/86400000);
-      items.forEach(x=>{x.studentId=obj.studentId;x.price=obj.price;x.start=obj.start;x.end=obj.end;x.note=obj.note;x.date=iso(addDays(fromIso(x.date),delta))});
+      items.forEach(x=>{x.studentId=obj.studentId;x.price=obj.price;x.mode=obj.mode;x.start=obj.start;x.end=obj.end;x.note=obj.note;x.date=iso(addDays(fromIso(x.date),delta))});
       const clicked=state.data.lessons.find(x=>x.id===old.id);if(clicked){clicked.paid=obj.paid;clicked.autoPaid=obj.autoPaid;clicked.status=obj.status}
     }
     save();render();
@@ -1061,7 +1076,8 @@ function openCard(id){
   <div class="summary" style="margin-top:-8px">${z.balance>0?'Передоплата':z.balance<0?'Борг':'Розраховано'}</div>${z.balance>0?`<div class="summary" style="margin-top:4px;color:var(--good);font-weight:800">${esc(prepayCoverage(st,z))}</div>`:''}
   <button class="choiceBtn" id="archiveStudent" style="margin-top:12px">${st.archived?'↩ Відновити з архіву':'📦 До архіву'}<small>${st.archived?'Повернути учня в активний список':'Приховати з активного списку, не видаляючи історію'}</small></button>
   <div class="section">Внести оплату</div><div><label>Сума</label><input id="payAmount" type="number" placeholder="1400"></div><div><label>Коментар</label><input id="payNote" placeholder="Напр. Mono, за вересень"></div><button class="primary" id="addPay">Додати оплату</button>
-  <div class="section">Останні оплати</div>${ps.length?ps.map(p=>`<div class="history"><div><div class="h1">${esc(p.note||'Оплата')}</div><div class="h2">${fmt(p.date)}</div></div><b style="color:var(--good)">+${money(p.amount)}</b></div>`).join(''):'<div class="empty">Оплат ще немає</div>'}
+  <div class="section">Останні оплати</div>${ps.length?ps.map(p=>`<div class="history"><div><div class="h1">${esc(p.note||'Оплата')}</div><div class="h2">${fmt(p.date)}</div></div><div style="display:flex;align-items:center;gap:8px"><b style="color:var(--good)">+${money(p.amount)}</b><button class="miniDelete" data-del-pay="${p.id}">Видалити</button></div></div>`).join(''):'<div class="empty">Оплат ще немає</div>'}
+  <div class="section">Статистика учня</div><div><label>Місяць</label><input id="studentStatMonth" type="month" value="${iso(new Date()).slice(0,7)}"></div><div id="studentStatBox"></div>
   <div class="section">Останні заняття</div>${ls.length?ls.map(l=>`<div class="history"><div><div class="h1">${fmt(l.date)} · ${l.start}</div><div class="h2">${esc(l.note||'Заняття')} · ${statusLabel(l.status)}</div></div><b style="color:${l.paid?'var(--good)':'var(--bad)'}">${l.paid?'Оплачено':'Не оплачено'}</b></div>`).join(''):'<div class="empty">Занять ще немає</div>'}</div>`;
   openModal(m,'income');m.querySelector('.close').onclick=()=>closeModal(m);
   document.getElementById('editSt').onclick=()=>{m.classList.remove('open');openStudent(st)};
@@ -1070,6 +1086,8 @@ function openCard(id){
     if(!confirm(`Справді ${action}? Історія занять та оплат збережеться.`))return;
     st.archived=!st.archived; save(); m.classList.remove('open'); history.replaceState({tab:state.tab},''); render();
   };
+  m.querySelectorAll('[data-del-pay]').forEach(b=>b.onclick=()=>{const p=state.data.payments.find(x=>x.id===b.dataset.delPay);if(!p)return;if(!confirm(`Видалити оплату ${money(p.amount)} від ${fmt(p.date)}?`))return;state.data.payments=state.data.payments.filter(x=>x.id!==p.id);if(p.source==='lesson'&&p.lessonId){const l=state.data.lessons.find(x=>x.id===p.lessonId);if(l){l.paid=false;l.autoPaid=false;l.paidAt=null}}save();m.classList.remove('open');openCard(id);render()});
+  const drawStudentStats=()=>{const ym=document.getElementById('studentStatMonth').value,arr=z.lessons.filter(l=>String(l.date).slice(0,7)===ym),conducted=arr.filter(l=>l.status==='conducted').length,cancelled=arr.filter(l=>l.status==='cancelled').length,noShow=arr.filter(l=>l.status==='no_show').length,planned=arr.filter(l=>l.status==='planned').length,decided=conducted+noShow,attendance=decided?Math.round(conducted/decided*100):0,paidMonth=z.payments.filter(p=>String(p.date).slice(0,7)===ym).reduce((a,p)=>a+Number(p.amount||0),0);document.getElementById('studentStatBox').innerHTML=`<div class="reportSection"><div class="reportRow"><span>Заплановано</span><b>${planned}</b></div><div class="reportRow"><span>Проведено</span><b>${conducted}</b></div><div class="reportRow"><span>Не прийшов</span><b>${noShow}</b></div><div class="reportRow"><span>Скасовано</span><b>${cancelled}</b></div><div class="reportRow"><span>Відвідуваність</span><b>${attendance}%</b></div><div class="reportRow"><span>Отримано оплат</span><b>${money(paidMonth)}</b></div><div class="reportRow"><span>Поточний баланс</span><b>${z.balance>0?'+':''}${money(z.balance)}</b></div></div>`};document.getElementById('studentStatMonth').onchange=drawStudentStats;drawStudentStats();
   document.getElementById('addPay').onclick=()=>{const a=Number(document.getElementById('payAmount').value||0);if(a<=0)return alert('Введи суму');state.data.payments.push({id:uid(),studentId:id,amount:a,date:iso(new Date()),note:document.getElementById('payNote').value.trim()});save();m.classList.remove('open');openCard(id);render()};
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
