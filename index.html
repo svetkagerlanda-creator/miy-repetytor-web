@@ -42,7 +42,7 @@ button{cursor:pointer}
 .daycol{position:relative;width:var(--dayw);flex:0 0 var(--dayw);height:calc(var(--hour) * 15);border-left:1px solid var(--line)}
 .hourline{height:var(--hour);border-bottom:1px solid var(--line)}
 .lesson{position:absolute;left:2px;right:2px;border:0;border-radius:5px;padding:4px 3px;text-align:left;color:#fff;overflow:hidden;box-shadow:0 1px 2px #0002}
-.lesson .name{font-size:10px;font-weight:850;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lesson .name{font-size:10px;font-weight:850;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lesson .studentClass{font-size:8px;font-weight:800;line-height:1.05;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.98}
 .lesson .meta{font-size:8.5px;font-weight:750;margin-top:3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:clip}.lesson.school{color:#fff;padding:3px}.lesson.school .schoolClass{font-size:10px;font-weight:900;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lesson.school .schoolSubject{font-size:8.8px;font-weight:800;line-height:1.05;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lesson .mode{font-size:7.5px;margin-top:2px;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lesson .paidmark{font-size:10px;font-weight:900;float:right;margin-left:2px}
 .students{height:100%;overflow:auto;background:var(--bg)}
@@ -172,7 +172,7 @@ function calEnd(){return Math.max(calStart()+1,Math.min(24,Number(calendarSettin
 const HOURPX=66;
 const KEY='miy_repetytor_v4_2_8';
 const TABKEY='miy_repetytor_active_tab';
-const APP_VERSION='5.1.0';
+const APP_VERSION='5.1.1';
 const COLOR_OPTIONS=[
   ['#ef4444','Червоний'],['#f43f5e','Малиновий'],['#e11d48','Рубіновий'],['#fb7185','Рожево-червоний'],['#ec4899','Рожевий'],['#db2777','Фуксія'],['#d946ef','Пурпурний'],['#c026d3','Маджента'],
   ['#a855f7','Фіолетовий'],['#9333ea','Насичений фіолетовий'],['#8b5cf6','Лавандовий'],['#7c3aed','Темно-лавандовий'],['#6366f1','Індиго'],['#4f46e5','Темний індиго'],['#3b82f6','Синій'],['#2563eb','Королівський синій'],
@@ -386,7 +386,7 @@ function renderCalendar(){
       const statusClass=l.status==='cancelled'?' cancelled':l.status==='no_show'?' no_show':'';
       const statusMini=l.status==='cancelled'?' · ×':l.status==='no_show'?' · !':'';
       return `<button class="lesson${statusClass}" data-kind="tutor" data-id="${l.id}" style="top:calc(var(--hour) * ${top});height:calc(var(--hour) * ${dur} - 2px);background:${st.color}">
-        <div class="name">${esc(st.name)}${st.cls?` · ${esc(st.cls)}`:''}${statusMini}</div><div class="meta">${l.mode==='remote'?'💻':'🏫'} ${money(l.price)} <span class="paidmark">${l.paid?'✓':''}</span></div>
+        <div class="name">${esc(st.name)}${statusMini}</div>${st.cls?`<div class="studentClass">${esc(st.cls)}</div>`:''}<div class="meta">${l.mode==='remote'?'💻 Онлайн':'🏫 Очно'} · ${money(l.price)} <span class="paidmark">${l.paid?'✓':''}</span></div>
       </button>`
     }).join('');
     const school=state.data.schoolLessons.filter(l=>l.date===d && !isVacationDate(l.date,l.classId)).map(l=>{
@@ -867,6 +867,7 @@ function openTutorLesson(l=null,preset={}){
       <div id="repeatUntil" class="repeatUntil"><label>Повторювати до</label><input id="lfRepeatUntil" type="date" value="${repeatUntilDefault(val.date)}"><div id="extraSlots"></div><button type="button" class="secondary" id="addRepeatSlot" style="margin-top:10px">+ Ще один день / час</button></div>`:''}
     <div><label>Статус</label><select id="lfStatus">${statusOptionsHtml(val.status)}</select></div>
     <div><label>Примітка</label><textarea id="lfNote" placeholder="Необов’язково">${esc(val.note)}</textarea></div>
+    ${l?.seriesId?`<div><label>Застосувати зміни</label><select id="lfSeriesScope"><option value="one">Лише до цього заняття</option><option value="following">До цього та всіх наступних</option><option value="all">До всієї серії</option></select></div>`:''}
     ${l?`<div class="paybox"><b>Оплата</b><button id="paidBtn" class="pill" style="background:${val.paid?'#dcfce7':'#fee2e2'};color:${val.paid?'#15803d':'#b91c1c'}">${val.paid?'Оплачено':'Не оплачено'}</button></div>
     <button class="secondary" id="moveLessonBtn">↪ Перенести заняття</button>
     <div class="moveBox" id="moveLessonBox">
@@ -917,7 +918,10 @@ function openTutorLesson(l=null,preset={}){
       }else state.data.lessons.push(obj);
       save();finishModalSave(m);return;
     }
-    if(l.seriesId) editTutorSeries(l,obj,m); else {
+    if(l.seriesId){
+      const scope=document.getElementById('lfSeriesScope')?.value;
+      if(scope) applyTutorSeriesEdit(l,obj,scope,m); else editTutorSeries(l,obj,m);
+    } else {
       state.data.lessons=state.data.lessons.map(x=>x.id===l.id?obj:x);save();finishModalSave(m);
     }
   };
@@ -987,26 +991,28 @@ function chooseSeries(title,cb){
     const scope=b.dataset.scope;m.classList.remove('open');history.replaceState({tab:state.tab},'');cb(scope);
   });
 }
+function applyTutorSeriesEdit(old,obj,scope,parent){
+  const items=state.data.lessons.filter(x=>x.seriesId===old.seriesId);
+  if(scope==='one'){
+    state.data.lessons=state.data.lessons.map(x=>x.id===old.id?{...obj,seriesId:null}:x);
+  }else if(scope==='following'){
+    const base=fromIso(obj.date), oldBase=fromIso(old.date);
+    items.filter(x=>x.date>=old.date).forEach(x=>{
+      const weeks=Math.round((fromIso(x.date)-oldBase)/(7*86400000));
+      Object.assign(x,{studentId:obj.studentId,price:obj.price,mode:obj.mode,start:obj.start,end:obj.end,note:obj.note,date:iso(addDays(base,weeks*7))});
+      if(x.id===old.id){x.paid=obj.paid;x.autoPaid=obj.autoPaid;x.status=obj.status}
+    });
+  }else{
+    const delta=Math.round((fromIso(obj.date)-fromIso(old.date))/86400000);
+    items.forEach(x=>{x.studentId=obj.studentId;x.price=obj.price;x.mode=obj.mode;x.start=obj.start;x.end=obj.end;x.note=obj.note;x.date=iso(addDays(fromIso(x.date),delta))});
+    const clicked=state.data.lessons.find(x=>x.id===old.id);if(clicked){clicked.paid=obj.paid;clicked.autoPaid=obj.autoPaid;clicked.status=obj.status}
+  }
+  save();
+  if(parent)finishModalSave(parent);else render();
+}
 function editTutorSeries(old,obj,parent){
   parent.classList.remove('open');history.replaceState({tab:state.tab},'');
-  chooseSeries('Змінити повторюване заняття',scope=>{
-    const items=state.data.lessons.filter(x=>x.seriesId===old.seriesId);
-    if(scope==='one'){
-      state.data.lessons=state.data.lessons.map(x=>x.id===old.id?{...obj,seriesId:null}:x);
-    }else if(scope==='following'){
-      const base=fromIso(obj.date), oldBase=fromIso(old.date);
-      items.filter(x=>x.date>=old.date).forEach(x=>{
-        const weeks=Math.round((fromIso(x.date)-oldBase)/(7*86400000));
-        Object.assign(x,{studentId:obj.studentId,price:obj.price,mode:obj.mode,start:obj.start,end:obj.end,note:obj.note,date:iso(addDays(base,weeks*7))});
-        if(x.id===old.id){x.paid=obj.paid;x.autoPaid=obj.autoPaid;x.status=obj.status}
-      });
-    }else{
-      const delta=Math.round((fromIso(obj.date)-fromIso(old.date))/86400000);
-      items.forEach(x=>{x.studentId=obj.studentId;x.price=obj.price;x.mode=obj.mode;x.start=obj.start;x.end=obj.end;x.note=obj.note;x.date=iso(addDays(fromIso(x.date),delta))});
-      const clicked=state.data.lessons.find(x=>x.id===old.id);if(clicked){clicked.paid=obj.paid;clicked.autoPaid=obj.autoPaid;clicked.status=obj.status}
-    }
-    save();render();
-  });
+  chooseSeries('Змінити повторюване заняття',scope=>applyTutorSeriesEdit(old,obj,scope,null));
 }
 function editSchoolSeries(old,obj,parent){
   parent.classList.remove('open');history.replaceState({tab:state.tab},'');
